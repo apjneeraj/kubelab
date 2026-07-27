@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KubeLab — Browser Kubernetes Lab</title>
+<style>
+  :root {
+    --k8s-blue: #326ce5;
+    --k8s-blue-dark: #2450a8;
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --border: #2a3342;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --green: #3fb950;
+    --amber: #d29922;
+    --red: #f85149;
+    --cyan: #56d4dd;
+    --mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 80% -10%, #16233f 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(50,108,229,0.10), transparent);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+  }
+  .logo {
+    width: 34px; height: 34px; flex: 0 0 auto;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
+  header h1 span { color: var(--k8s-blue); }
+  header .tag {
+    font-size: 11px; color: var(--muted); border: 1px solid var(--border);
+    padding: 2px 8px; border-radius: 999px; margin-left: 2px;
+  }
+  header .spacer { flex: 1; }
+  .cluster-stat {
+    display: flex; flex-direction: column; align-items: flex-end;
+    font-size: 11px; color: var(--muted); line-height: 1.4;
+  }
+  .cluster-stat b { color: var(--text); font-size: 13px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+    padding: 16px 22px 28px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+  @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel > .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 15px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+    font-weight: 600; font-size: 13px;
+  }
+  .panel-head .count {
+    color: var(--muted); font-weight: 500; font-size: 12px;
+  }
+  .panel-body { padding: 14px 15px; }
+
+  /* Nodes / cluster viz */
+  .nodes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .node {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    padding: 10px;
+    min-height: 120px;
+  }
+  .node .node-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .node .node-name { font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+  .node .role { font-size: 10px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .dot.Ready, .dot.Running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.Pending { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .dot.ContainerCreating { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+  .dot.Terminating, .dot.Error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  .pods { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pod {
+    width: 42px; height: 42px; border-radius: 8px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; cursor: pointer;
+    background: #10233f;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .pod:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.4); border-color: var(--k8s-blue); }
+  .pod svg { width: 22px; height: 22px; }
+  .pod.Running svg { color: var(--green); }
+  .pod.Pending svg { color: var(--amber); }
+  .pod.ContainerCreating svg { color: var(--cyan); animation: spin 1.4s linear infinite; }
+  .pod.Terminating { opacity: .5; }
+  .pod .badge {
+    position: absolute; bottom: -4px; right: -4px;
+    background: var(--k8s-blue); color: #fff; font-size: 9px;
+    border-radius: 6px; padding: 0 3px; border: 1px solid var(--bg);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-hint { color: var(--muted); font-size: 12px; font-style: italic; padding: 6px 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; }
+  td .status { display: inline-flex; align-items: center; }
+  .tables-wrap { display: grid; gap: 14px; }
+  .table-scroll { overflow-x: auto; }
+
+  /* Terminal */
+  .term-panel { grid-column: 1 / -1; }
+  #terminal {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+    background: #0a0e14; padding: 14px 16px; height: 260px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  #terminal .cmd { color: var(--text); }
+  #terminal .cmd .prompt { color: var(--k8s-blue); }
+  #terminal .out { color: #c7d2de; }
+  #terminal .err { color: var(--red); }
+  #terminal .ok { color: var(--green); }
+  #terminal .muted { color: var(--muted); }
+  .term-input-row {
+    display: flex; align-items: center; gap: 8px;
+    border-top: 1px solid var(--border); background: #0a0e14; padding: 10px 16px;
+  }
+  .term-input-row .prompt { color: var(--k8s-blue); font-family: var(--mono); font-size: 13px; }
+  #cmd {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: var(--mono); font-size: 13px;
+  }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 15px; border-top: 1px solid var(--border); background: var(--panel-2); }
+  button.chip {
+    background: #10233f; color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+    font-family: var(--mono);
+  }
+  button.chip:hover { border-color: var(--k8s-blue); background: #143059; }
+  button.chip.danger:hover { border-color: var(--red); background: #3a1417; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); padding: 0 15px 12px; }
+  .legend span { display: inline-flex; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <svg class="logo" viewBox="0 0 128 128" aria-hidden="true">
+    <path fill="#326ce5" d="M63.7 5.9 16.9 28.5a8 8 0 0 0-4.3 5.4L1.1 84.9a8 8 0 0 0 1.5 6.8l32.4 40.3a8 8 0 0 0 6.2 3h51.9a8 8 0 0 0 6.2-3l32.4-40.3a8 8 0 0 0 1.5-6.8l-11.6-51a8 8 0 0 0-4.3-5.4L70.5 5.9a8 8 0 0 0-6.8 0z" transform="scale(.9) translate(6 -1)"/>
+    <g fill="#fff">
+      <circle cx="64" cy="40" r="6"/><circle cx="64" cy="88" r="6"/>
+      <circle cx="40" cy="54" r="6"/><circle cx="88" cy="54" r="6"/>
+      <circle cx="44" cy="82" r="6"/><circle cx="84" cy="82" r="6"/>
+      <circle cx="64" cy="64" r="9"/>
+    </g>
+  </svg>
+  <div>
+    <h1><span>Kube</span>Lab</h1>
+  </div>
+  <span class="tag">simulated cluster · runs 100% in your browser</span>
+  <div class="spacer"></div>
+  <div class="cluster-stat">
+    <div><b id="stat-pods">0</b> pods running</div>
+    <div><span id="stat-deploys">0</span> deployments · <span id="stat-svcs">0</span> services</div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Cluster visualization -->
+  <div class="panel">
+    <div class="panel-head">Cluster topology <span class="count" id="node-count"></span></div>
+    <div class="panel-body">
+      <div class="nodes" id="nodes"></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot Running"></span>Running</span>
+      <span><span class="dot ContainerCreating"></span>ContainerCreating</span>
+      <span><span class="dot Pending"></span>Pending</span>
+      <span><span class="dot Terminating"></span>Terminating</span>
+    </div>
+  </div>
+
+  <!-- Resource tables -->
+  <div class="panel">
+    <div class="panel-head">Resources</div>
+    <div class="panel-body tables-wrap">
+      <div>
+        <div class="panel-head" style="background:transparent;border:none;padding:0 0 6px;">Deployments <span class="count" id="deploy-count"></span></div>
+        <div class="table-scroll"><table id="deploy-table"></table></div>
+      </div>
+      <div>
+        <div class="panel-head" style="background:transparent;border:none;padding:0 0 6px;">Services <span class="count" id="svc-count"></span></div>
+        <div class="table-scroll"><table id="svc-table"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="panel term-panel">
+    <div class="panel-head">kubectl terminal <span class="count">type <code>help</code> to see commands</span></div>
+    <div id="terminal"></div>
+    <div class="term-input-row">
+      <span class="prompt">$</span>
+      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="kubectl get pods" />
+    </div>
+    <div class="toolbar">
+      <button class="chip" data-cmd="kubectl create deployment web --image=nginx --replicas=3">create nginx x3</button>
+      <button class="chip" data-cmd="kubectl scale deployment web --replicas=5">scale web to 5</button>
+      <button class="chip" data-cmd="kubectl expose deployment web --port=80 --type=NodePort">expose web</button>
+      <button class="chip" data-cmd="kubectl get all">get all</button>
+      <button class="chip" data-cmd="chaos">chaos: kill a pod</button>
+      <button class="chip danger" data-cmd="reset">reset cluster</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// KubeLab — a tiny in-browser Kubernetes control-plane simulator.
+// Everything (state, reconcile loop, kubectl parser) lives in this one file.
+// ---------------------------------------------------------------------------
+
+const CUBE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>';
+
+const LIFECYCLE = { PENDING: 800, CREATING: 1600 }; // ms offsets
+
+let podSeq = 0;
+let svcIpSeq = 10;
+let podIpSeq = 10;
+
+const state = {
+  nodes: [],
+  deployments: {}, // name -> {name, image, replicas, hash, labels}
+  pods: [],        // {name, deploy, image, status, node, ip, restarts, born}
+  services: {},    // name -> {name, type, selector, port, targetPort, clusterIP, nodePort}
+};
+
+function initCluster() {
+  state.nodes = [
+    { name: "kube-control-plane", role: "control-plane", status: "Ready" },
+    { name: "kube-worker-1", role: "<none>", status: "Ready" },
+    { name: "kube-worker-2", role: "<none>", status: "Ready" },
+  ];
+  state.deployments = {};
+  state.pods = [];
+  state.services = {};
+  podSeq = 0; svcIpSeq = 10; podIpSeq = 10;
+}
+
+function rand(len) {
+  const c = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let s = "";
+  for (let i = 0; i < len; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+
+function workerNodes() {
+  return state.nodes.filter(n => n.role !== "control-plane" && n.status === "Ready");
+}
+
+// Schedule a pod onto the worker node with the fewest pods.
+function scheduleNode() {
+  const workers = workerNodes();
+  if (workers.length === 0) return state.nodes[0].name;
+  const counts = {};
+  workers.forEach(w => counts[w.name] = 0);
+  state.pods.forEach(p => { if (counts[p.node] != null) counts[p.node]++; });
+  return workers.sort((a, b) => counts[a.name] - counts[b.name])[0].name;
+}
+
+function newPod(deploy) {
+  const d = state.deployments[deploy];
+  const pod = {
+    name: `${deploy}-${d.hash}-${rand(5)}`,
+    deploy,
+    image: d.image,
+    status: "Pending",
+    node: scheduleNode(),
+    ip: null,
+    restarts: 0,
+    born: Date.now() + (podSeq++),
+  };
+  state.pods.push(pod);
+  // Simulate the pod lifecycle: Pending -> ContainerCreating -> Running.
+  setTimeout(() => {
+    if (!state.pods.includes(pod)) return;
+    pod.status = "ContainerCreating";
+    render();
+  }, LIFECYCLE.PENDING);
+  setTimeout(() => {
+    if (!state.pods.includes(pod)) return;
+    pod.status = "Running";
+    pod.ip = `10.244.${Math.floor(podIpSeq / 254)}.${(podIpSeq++ % 254) + 1}`;
+    render();
+  }, LIFECYCLE.CREATING);
+  return pod;
+}
+
+function podsOf(deploy) {
+  return state.pods.filter(p => p.deploy === deploy && p.status !== "Terminating");
+}
+
+function terminatePod(pod) {
+  pod.status = "Terminating";
+  render();
+  setTimeout(() => {
+    state.pods = state.pods.filter(p => p !== pod);
+    render();
+  }, 700);
+}
+
+// The reconcile loop: make actual pod count converge to desired replicas.
+function reconcile() {
+  Object.values(state.deployments).forEach(d => {
+    const alive = podsOf(d.name);
+    if (alive.length < d.replicas) {
+      for (let i = alive.length; i < d.replicas; i++) newPod(d.name);
+    } else if (alive.length > d.replicas) {
+      const extra = alive
+        .sort((a, b) => b.born - a.born)
+        .slice(0, alive.length - d.replicas);
+      extra.forEach(terminatePod);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function render() {
+  renderNodes();
+  renderDeployTable();
+  renderSvcTable();
+  renderStats();
+}
+
+function renderStats() {
+  const running = state.pods.filter(p => p.status === "Running").length;
+  document.getElementById("stat-pods").textContent = running;
+  document.getElementById("stat-deploys").textContent = Object.keys(state.deployments).length;
+  document.getElementById("stat-svcs").textContent = Object.keys(state.services).length;
+  document.getElementById("node-count").textContent = `(${state.nodes.length} nodes)`;
+  document.getElementById("deploy-count").textContent = `(${Object.keys(state.deployments).length})`;
+  document.getElementById("svc-count").textContent = `(${Object.keys(state.services).length})`;
+}
+
+function renderNodes() {
+  const wrap = document.getElementById("nodes");
+  wrap.innerHTML = "";
+  state.nodes.forEach(node => {
+    const el = document.createElement("div");
+    el.className = "node";
+    const pods = state.pods.filter(p => p.node === node.name);
+    let podsHtml = pods.map(p => `
+      <div class="pod ${p.status}" title="${p.name}\n${p.image}\nstatus: ${p.status}\nnode: ${p.node}${p.ip ? "\nip: " + p.ip : ""}">
+        ${CUBE_SVG}${p.restarts ? `<span class="badge">↻${p.restarts}</span>` : ""}
+      </div>`).join("");
+    if (pods.length === 0) podsHtml = `<div class="empty-hint">no pods scheduled</div>`;
+    el.innerHTML = `
+      <div class="node-head">
+        <span class="node-name">${node.name}</span>
+        <span class="role"><span class="dot ${node.status}"></span>${node.role}</span>
+      </div>
+      <div class="pods">${podsHtml}</div>`;
+    wrap.appendChild(el);
+  });
+}
+
+function renderDeployTable() {
+  const t = document.getElementById("deploy-table");
+  const names = Object.keys(state.deployments);
+  if (names.length === 0) { t.innerHTML = `<tr><td class="muted" style="font-family:var(--sans);color:var(--muted)">No deployments. Try <code>kubectl create deployment web --image=nginx --replicas=3</code></td></tr>`; return; }
+  let rows = `<tr><th>Name</th><th>Ready</th><th>Up-to-date</th><th>Image</th></tr>`;
+  names.forEach(n => {
+    const d = state.deployments[n];
+    const ready = podsOf(n).filter(p => p.status === "Running").length;
+    rows += `<tr><td style="color:var(--cyan)">${n}</td><td>${ready}/${d.replicas}</td><td>${d.replicas}</td><td>${d.image}</td></tr>`;
+  });
+  t.innerHTML = rows;
+}
+
+function renderSvcTable() {
+  const t = document.getElementById("svc-table");
+  const names = Object.keys(state.services);
+  if (names.length === 0) { t.innerHTML = `<tr><td class="muted" style="font-family:var(--sans);color:var(--muted)">No services. Expose a deployment with <code>kubectl expose</code></td></tr>`; return; }
+  let rows = `<tr><th>Name</th><th>Type</th><th>Cluster-IP</th><th>Port(s)</th></tr>`;
+  names.forEach(n => {
+    const s = state.services[n];
+    const ports = s.type === "NodePort" ? `${s.port}:${s.nodePort}/TCP` : `${s.port}/TCP`;
+    rows += `<tr><td style="color:var(--cyan)">${n}</td><td>${s.type}</td><td>${s.clusterIP}</td><td>${ports}</td></tr>`;
+  });
+  t.innerHTML = rows;
+}
+
+// ---------------------------------------------------------------------------
+// Terminal
+// ---------------------------------------------------------------------------
+const termEl = document.getElementById("terminal");
+const history = [];
+let histIdx = -1;
+
+function print(text, cls = "out") {
+  const div = document.createElement("div");
+  div.className = cls;
+  div.textContent = text;
+  termEl.appendChild(div);
+  termEl.scrollTop = termEl.scrollHeight;
+}
+function printHTML(html, cls = "out") {
+  const div = document.createElement("div");
+  div.className = cls;
+  div.innerHTML = html;
+  termEl.appendChild(div);
+  termEl.scrollTop = termEl.scrollHeight;
+}
+function echoCmd(cmd) {
+  printHTML(`<span class="prompt">$</span> ${cmd.replace(/</g, "&lt;")}`, "cmd");
+}
+
+// Simple flag parser: returns {_: [positional], flag: value}
+function parseArgs(tokens) {
+  const out = { _: [] };
+  tokens.forEach(t => {
+    if (t.startsWith("--")) {
+      const [k, v] = t.slice(2).split("=");
+      out[k] = v === undefined ? true : v;
+    } else out._.push(t);
+  });
+  return out;
+}
+
+function pad(s, n) { s = String(s); return s + " ".repeat(Math.max(1, n - s.length)); }
+
+function ageOf(born) {
+  const secs = Math.max(0, Math.floor((Date.now() - born) / 1000));
+  if (secs < 60) return secs + "s";
+  if (secs < 3600) return Math.floor(secs / 60) + "m";
+  return Math.floor(secs / 3600) + "h";
+}
+
+const handlers = {
+  help() {
+    print("KubeLab supported commands:", "ok");
+    const lines = [
+      ["kubectl get nodes|pods|deployments|services|all", "list resources (add -o wide for pods)"],
+      ["kubectl create deployment <name> --image=<img> [--replicas=n]", "create a deployment"],
+      ["kubectl run <name> --image=<img>", "run a single pod deployment"],
+      ["kubectl scale deployment <name> --replicas=n", "change desired replicas"],
+      ["kubectl expose deployment <name> --port=n [--target-port=n] [--type=NodePort]", "create a Service"],
+      ["kubectl delete pod|deployment|service <name>", "delete a resource (pods self-heal)"],
+      ["kubectl describe pod|deployment <name>", "show resource detail"],
+      ["kubectl logs <pod>", "show fake pod logs"],
+      ["chaos", "kill a random pod and watch it recover"],
+      ["clear", "clear the terminal"],
+      ["reset", "reset the whole cluster"],
+    ];
+    lines.forEach(([c, d]) => printHTML(`  <span style="color:var(--cyan)">${pad(c, 62)}</span><span class="muted">${d}</span>`));
+  },
+
+  clear() { termEl.innerHTML = ""; },
+
+  reset() { initCluster(); render(); print("Cluster reset. 3 nodes ready, no workloads.", "ok"); },
+
+  chaos() {
+    const running = state.pods.filter(p => p.status === "Running" || p.status === "ContainerCreating");
+    if (running.length === 0) { print("No pods to disrupt. Create a deployment first.", "err"); return; }
+    const victim = running[Math.floor(Math.random() * running.length)];
+    print(`chaos: killing pod ${victim.name} on ${victim.node}`, "err");
+    terminatePod(victim);
+    print("The Deployment controller will reconcile and recreate it...", "muted");
+    setTimeout(reconcile, 800);
+  },
+
+  kubectl(tokens) {
+    const verb = tokens[0];
+    const rest = tokens.slice(1);
+    switch (verb) {
+      case "get": return kubectlGet(rest);
+      case "create": return kubectlCreate(rest);
+      case "run": return kubectlRun(rest);
+      case "scale": return kubectlScale(rest);
+      case "expose": return kubectlExpose(rest);
+      case "delete": return kubectlDelete(rest);
+      case "describe": return kubectlDescribe(rest);
+      case "logs": return kubectlLogs(rest);
+      case "version":
+        return print("Client Version: v1.30.0 (KubeLab)\nServer Version: v1.30.0 (simulated)", "out");
+      default:
+        print(`error: unknown kubectl command "${verb || ""}". Try "help".`, "err");
+    }
+  },
+};
+
+function kubectlGet(rest) {
+  const args = parseArgs(rest);
+  const kind = (args._[0] || "").replace(/s$/, "");
+  const wide = args.o === "wide";
+  if (["node", "no"].includes(kind)) {
+    print(pad("NAME", 22) + pad("STATUS", 9) + pad("ROLES", 16) + "VERSION");
+    state.nodes.forEach(n => print(pad(n.name, 22) + pad(n.status, 9) + pad(n.role, 16) + "v1.30.0"));
+    return;
+  }
+  if (["pod", "po"].includes(kind)) {
+    if (state.pods.length === 0) return print("No resources found in default namespace.", "muted");
+    let header = pad("NAME", 30) + pad("READY", 7) + pad("STATUS", 18) + pad("RESTARTS", 10) + "AGE";
+    if (wide) header += pad("", 0) + "   " + pad("IP", 16) + "NODE";
+    print(header);
+    state.pods.forEach(p => {
+      const ready = p.status === "Running" ? "1/1" : "0/1";
+      let line = pad(p.name, 30) + pad(ready, 7) + pad(p.status, 18) + pad(p.restarts, 10) + ageOf(p.born);
+      if (wide) line += "   " + pad(p.ip || "<none>", 16) + p.node;
+      print(line);
+    });
+    return;
+  }
+  if (["deployment", "deploy"].includes(kind)) return renderGetDeploy();
+  if (["service", "svc"].includes(kind)) return renderGetSvc();
+  if (kind === "all") {
+    renderGetDeploy(); print(""); kubectlGet(["pods"]); print(""); renderGetSvc();
+    return;
+  }
+  print(`error: the server doesn't have a resource type "${args._[0] || ""}"`, "err");
+}
+
+function renderGetDeploy() {
+  const names = Object.keys(state.deployments);
+  if (names.length === 0) return print("No deployments found.", "muted");
+  print(pad("NAME", 16) + pad("READY", 8) + pad("UP-TO-DATE", 12) + pad("AVAILABLE", 11) + "AGE");
+  names.forEach(n => {
+    const d = state.deployments[n];
+    const ready = podsOf(n).filter(p => p.status === "Running").length;
+    print(pad(n, 16) + pad(`${ready}/${d.replicas}`, 8) + pad(d.replicas, 12) + pad(ready, 11) + ageOf(d.born));
+  });
+}
+
+function renderGetSvc() {
+  const names = Object.keys(state.services);
+  if (names.length === 0) return print("No services found.", "muted");
+  print(pad("NAME", 16) + pad("TYPE", 12) + pad("CLUSTER-IP", 16) + pad("PORT(S)", 16) + "AGE");
+  names.forEach(n => {
+    const s = state.services[n];
+    const ports = s.type === "NodePort" ? `${s.port}:${s.nodePort}/TCP` : `${s.port}/TCP`;
+    print(pad(n, 16) + pad(s.type, 12) + pad(s.clusterIP, 16) + pad(ports, 16) + ageOf(s.born));
+  });
+}
+
+function createDeployment(name, image, replicas) {
+  if (state.deployments[name]) { print(`error: deployment "${name}" already exists`, "err"); return false; }
+  state.deployments[name] = {
+    name, image, replicas,
+    hash: rand(9),
+    born: Date.now(),
+    labels: { app: name },
+  };
+  reconcile();
+  return true;
+}
+
+function kubectlCreate(rest) {
+  const args = parseArgs(rest);
+  const sub = args._[0];
+  if (sub !== "deployment" && sub !== "deploy") return print("error: only 'create deployment' is supported", "err");
+  const name = args._[1];
+  if (!name) return print("error: NAME is required", "err");
+  if (!args.image) return print("error: --image is required", "err");
+  const replicas = parseInt(args.replicas || "1", 10);
+  if (createDeployment(name, args.image, replicas))
+    print(`deployment.apps/${name} created`, "ok");
+}
+
+function kubectlRun(rest) {
+  const args = parseArgs(rest);
+  const name = args._[0];
+  if (!name) return print("error: NAME is required", "err");
+  if (!args.image) return print("error: --image is required", "err");
+  if (createDeployment(name, args.image, 1)) print(`pod/${name} created`, "ok");
+}
+
+function kubectlScale(rest) {
+  const args = parseArgs(rest);
+  if (args._[0] !== "deployment" && args._[0] !== "deploy") return print("error: usage: kubectl scale deployment <name> --replicas=n", "err");
+  const name = args._[1];
+  const d = state.deployments[name];
+  if (!d) return print(`error: deployments.apps "${name}" not found`, "err");
+  if (args.replicas === undefined) return print("error: --replicas is required", "err");
+  d.replicas = Math.max(0, parseInt(args.replicas, 10));
+  reconcile();
+  print(`deployment.apps/${name} scaled`, "ok");
+}
+
+function kubectlExpose(rest) {
+  const args = parseArgs(rest);
+  if (args._[0] !== "deployment" && args._[0] !== "deploy") return print("error: usage: kubectl expose deployment <name> --port=n", "err");
+  const name = args._[1];
+  const d = state.deployments[name];
+  if (!d) return print(`error: deployments.apps "${name}" not found`, "err");
+  if (args.port === undefined) return print("error: --port is required", "err");
+  if (state.services[name]) return print(`error: service "${name}" already exists`, "err");
+  const type = args.type || "ClusterIP";
+  state.services[name] = {
+    name, type,
+    selector: { app: name },
+    port: parseInt(args.port, 10),
+    targetPort: parseInt(args["target-port"] || args.port, 10),
+    clusterIP: `10.96.${Math.floor(svcIpSeq / 254)}.${(svcIpSeq++ % 254) + 1}`,
+    nodePort: type === "NodePort" ? 30000 + Math.floor(Math.random() * 2768) : null,
+    born: Date.now(),
+  };
+  render();
+  print(`service/${name} exposed`, "ok");
+}
+
+function kubectlDelete(rest) {
+  const args = parseArgs(rest);
+  const kind = (args._[0] || "").replace(/s$/, "");
+  const name = args._[1];
+  if (!name) return print("error: resource name required", "err");
+  if (["pod", "po"].includes(kind)) {
+    const pod = state.pods.find(p => p.name === name && p.status !== "Terminating");
+    if (!pod) return print(`error: pods "${name}" not found`, "err");
+    terminatePod(pod);
+    print(`pod "${name}" deleted`, "ok");
+    setTimeout(reconcile, 800); // Deployment recreates it -> self-healing.
+    return;
+  }
+  if (["deployment", "deploy"].includes(kind)) {
+    if (!state.deployments[name]) return print(`error: deployments.apps "${name}" not found`, "err");
+    delete state.deployments[name];
+    state.pods.filter(p => p.deploy === name).forEach(terminatePod);
+    print(`deployment.apps "${name}" deleted`, "ok");
+    return;
+  }
+  if (["service", "svc"].includes(kind)) {
+    if (!state.services[name]) return print(`error: services "${name}" not found`, "err");
+    delete state.services[name];
+    render();
+    print(`service "${name}" deleted`, "ok");
+    return;
+  }
+  print(`error: unknown resource type "${args._[0]}"`, "err");
+}
+
+function kubectlDescribe(rest) {
+  const args = parseArgs(rest);
+  const kind = (args._[0] || "").replace(/s$/, "");
+  const name = args._[1];
+  if (["deployment", "deploy"].includes(kind)) {
+    const d = state.deployments[name];
+    if (!d) return print(`error: deployments.apps "${name}" not found`, "err");
+    const ready = podsOf(name).filter(p => p.status === "Running").length;
+    print(`Name:                   ${d.name}
+Namespace:              default
+Selector:               app=${d.name}
+Replicas:               ${d.replicas} desired | ${ready} available
+Image:                  ${d.image}
+StrategyType:           RollingUpdate
+Pods:                   ${podsOf(name).map(p => p.name).join(", ") || "<none>"}`);
+    return;
+  }
+  if (["pod", "po"].includes(kind)) {
+    const p = state.pods.find(x => x.name === name);
+    if (!p) return print(`error: pods "${name}" not found`, "err");
+    print(`Name:         ${p.name}
+Namespace:    default
+Node:         ${p.node}
+Status:       ${p.status}
+IP:           ${p.ip || "<none>"}
+Controlled By: ReplicaSet/${p.deploy}-${state.deployments[p.deploy] ? state.deployments[p.deploy].hash : "?"}
+Image:        ${p.image}
+Restarts:     ${p.restarts}`);
+    return;
+  }
+  print("error: usage: kubectl describe pod|deployment <name>", "err");
+}
+
+function kubectlLogs(rest) {
+  const name = rest[0];
+  const p = state.pods.find(x => x.name === name);
+  if (!p) return print(`error: pods "${name}" not found`, "err");
+  if (p.status !== "Running") return print(`error: pod "${name}" is not running (status: ${p.status})`, "err");
+  const now = new Date().toISOString();
+  print(`${now} Starting ${p.image} ...
+${now} Server listening on 0.0.0.0:80
+${now} ${p.ip} - GET / 200 OK
+${now} ${p.ip} - GET /healthz 200 OK`);
+}
+
+function runCommand(raw) {
+  const cmd = raw.trim();
+  if (!cmd) return;
+  echoCmd(cmd);
+  history.push(cmd);
+  histIdx = history.length;
+  const tokens = cmd.split(/\s+/);
+  const head = tokens[0];
+  if (handlers[head]) {
+    try { handlers[head](tokens.slice(1)); }
+    catch (e) { print("internal error: " + e.message, "err"); }
+  } else {
+    print(`command not found: ${head}. Type "help".`, "err");
+  }
+  render();
+}
+
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+const input = document.getElementById("cmd");
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") { runCommand(input.value); input.value = ""; }
+  else if (e.key === "ArrowUp") { if (histIdx > 0) { histIdx--; input.value = history[histIdx]; } e.preventDefault(); }
+  else if (e.key === "ArrowDown") { if (histIdx < history.length - 1) { histIdx++; input.value = history[histIdx]; } else { histIdx = history.length; input.value = ""; } e.preventDefault(); }
+});
+
+document.querySelectorAll("button.chip").forEach(btn => {
+  btn.addEventListener("click", () => {
+    input.value = btn.dataset.cmd;
+    runCommand(btn.dataset.cmd);
+    input.value = "";
+    input.focus();
+  });
+});
+
+document.getElementById("terminal").addEventListener("click", () => input.focus());
+
+// Keep ages / ready-counts fresh.
+setInterval(render, 1000);
+
+// Boot.
+initCluster();
+render();
+printHTML('<span class="ok">Welcome to KubeLab</span> — a simulated Kubernetes cluster running entirely in your browser.');
+print('3 nodes are Ready. Type "help" for commands, or click a button below to get started.', "muted");
+input.focus();
+</script>
+</body>
+</html>
