@@ -3,763 +3,908 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KubeLab — Browser Kubernetes Lab</title>
+<title>KubeLab — Interactive Kubernetes Learning Lab</title>
 <style>
   :root {
     --k8s-blue: #326ce5;
     --k8s-blue-dark: #2450a8;
-    --bg: #0d1117;
-    --panel: #161b22;
-    --panel-2: #1c2330;
-    --border: #2a3342;
+    --bg: #0b0f17;
+    --panel: #141a24;
+    --panel-2: #1b2430;
+    --panel-3: #222d3d;
+    --border: #2a3446;
     --text: #e6edf3;
     --muted: #8b98a9;
     --green: #3fb950;
     --amber: #d29922;
     --red: #f85149;
     --cyan: #56d4dd;
-    --mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+    --purple: #a371f7;
+    --pink: #db61a2;
+    --mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body { height: 100%; margin: 0; }
   body {
-    margin: 0;
-    background: radial-gradient(1200px 600px at 80% -10%, #16233f 0%, var(--bg) 55%);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 14px;
+    background: radial-gradient(1200px 700px at 85% -15%, #16233f 0%, var(--bg) 55%);
+    color: var(--text); font-family: var(--sans); font-size: 14px;
   }
-  header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 22px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(50,108,229,0.10), transparent);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    backdrop-filter: blur(6px);
-  }
-  .logo {
-    width: 34px; height: 34px; flex: 0 0 auto;
-  }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
-  header h1 span { color: var(--k8s-blue); }
-  header .tag {
-    font-size: 11px; color: var(--muted); border: 1px solid var(--border);
-    padding: 2px 8px; border-radius: 999px; margin-left: 2px;
-  }
-  header .spacer { flex: 1; }
-  .cluster-stat {
-    display: flex; flex-direction: column; align-items: flex-end;
-    font-size: 11px; color: var(--muted); line-height: 1.4;
-  }
-  .cluster-stat b { color: var(--text); font-size: 13px; }
+  a { color: var(--k8s-blue); }
+  code, .mono { font-family: var(--mono); }
 
-  .layout {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 16px;
-    padding: 16px 22px 28px;
-    max-width: 1500px;
-    margin: 0 auto;
+  /* Layout */
+  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  .sidebar {
+    background: #0c121c; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto;
   }
-  @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; border-bottom: 1px solid var(--border); }
+  .brand svg { width: 30px; height: 30px; }
+  .brand h1 { font-size: 17px; margin: 0; }
+  .brand h1 span { color: var(--k8s-blue); }
+  .brand small { display:block; color: var(--muted); font-size: 10px; letter-spacing:.4px; }
+  nav { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  nav .navgroup { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .6px; padding: 12px 10px 4px; }
+  nav button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: transparent; border: none; color: var(--text); padding: 9px 10px;
+    border-radius: 8px; cursor: pointer; font-size: 13.5px; font-family: var(--sans);
+  }
+  nav button .ic { width: 18px; text-align: center; opacity: .9; }
+  nav button:hover { background: var(--panel-2); }
+  nav button.active { background: linear-gradient(90deg, rgba(50,108,229,.28), rgba(50,108,229,.05)); color:#fff; box-shadow: inset 2px 0 0 var(--k8s-blue); }
+  .sidebar .foot { margin-top: auto; padding: 12px; color: var(--muted); font-size: 10.5px; border-top: 1px solid var(--border); }
 
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  .panel > .panel-head {
-    display: flex; align-items: center; gap: 10px;
-    padding: 11px 15px;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel-2);
-    font-weight: 600; font-size: 13px;
-  }
-  .panel-head .count {
-    color: var(--muted); font-weight: 500; font-size: 12px;
-  }
-  .panel-body { padding: 14px 15px; }
+  .main { padding: 22px 28px 60px; max-width: 1200px; }
+  .view { display: none; animation: fade .25s ease; }
+  .view.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform:none; } }
 
-  /* Nodes / cluster viz */
-  .nodes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-  .node {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: linear-gradient(180deg, var(--panel-2), var(--panel));
-    padding: 10px;
-    min-height: 120px;
-  }
-  .node .node-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  .node .node-name { font-family: var(--mono); font-size: 12px; color: var(--cyan); }
-  .node .role { font-size: 10px; color: var(--muted); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-  .dot.Ready, .dot.Running { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .dot.Pending { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-  .dot.ContainerCreating { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
-  .dot.Terminating, .dot.Error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  h2.title { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 20px; max-width: 780px; line-height: 1.5; }
 
-  .pods { display: flex; flex-wrap: wrap; gap: 7px; }
-  .pod {
-    width: 42px; height: 42px; border-radius: 8px;
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    position: relative; cursor: pointer;
-    background: #10233f;
-    transition: transform .12s ease, box-shadow .12s ease;
-  }
-  .pod:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.4); border-color: var(--k8s-blue); }
-  .pod svg { width: 22px; height: 22px; }
-  .pod.Running svg { color: var(--green); }
-  .pod.Pending svg { color: var(--amber); }
-  .pod.ContainerCreating svg { color: var(--cyan); animation: spin 1.4s linear infinite; }
-  .pod.Terminating { opacity: .5; }
-  .pod .badge {
-    position: absolute; bottom: -4px; right: -4px;
-    background: var(--k8s-blue); color: #fff; font-size: 9px;
-    border-radius: 6px; padding: 0 3px; border: 1px solid var(--bg);
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .empty-hint { color: var(--muted); font-size: 12px; font-style: italic; padding: 6px 2px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .panel .ph { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; background: var(--panel-2); border-radius: 12px 12px 0 0; display:flex; align-items:center; gap:8px; justify-content:space-between; }
+  .panel .pb { padding: 16px; }
+  .grid { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px) { .cols-2, .cols-3 { grid-template-columns: 1fr; } }
 
-  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
-  th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; }
-  td .status { display: inline-flex; align-items: center; }
-  .tables-wrap { display: grid; gap: 14px; }
-  .table-scroll { overflow-x: auto; }
+  .btn { background: var(--k8s-blue); color:#fff; border:none; padding: 9px 16px; border-radius: 8px; cursor:pointer; font-size: 13px; font-weight:600; font-family: var(--sans); }
+  .btn:hover { background: var(--k8s-blue-dark); }
+  .btn.ghost { background: var(--panel-3); }
+  .btn.ghost:hover { background: #2b3850; }
+  .btn.sm { padding: 6px 10px; font-size: 12px; }
+  .btn:disabled { opacity:.5; cursor: not-allowed; }
 
-  /* Terminal */
-  .term-panel { grid-column: 1 / -1; }
-  #terminal {
-    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
-    background: #0a0e14; padding: 14px 16px; height: 260px; overflow-y: auto;
-    white-space: pre-wrap; word-break: break-word;
+  label.fld { display:block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; background: #0c121c; border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-family: var(--mono); font-size: 13px; outline: none;
   }
-  #terminal .cmd { color: var(--text); }
-  #terminal .cmd .prompt { color: var(--k8s-blue); }
-  #terminal .out { color: #c7d2de; }
-  #terminal .err { color: var(--red); }
-  #terminal .ok { color: var(--green); }
-  #terminal .muted { color: var(--muted); }
-  .term-input-row {
-    display: flex; align-items: center; gap: 8px;
-    border-top: 1px solid var(--border); background: #0a0e14; padding: 10px 16px;
-  }
-  .term-input-row .prompt { color: var(--k8s-blue); font-family: var(--mono); font-size: 13px; }
-  #cmd {
-    flex: 1; background: transparent; border: none; outline: none;
-    color: var(--text); font-family: var(--mono); font-size: 13px;
-  }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 15px; border-top: 1px solid var(--border); background: var(--panel-2); }
-  button.chip {
-    background: #10233f; color: var(--text); border: 1px solid var(--border);
-    border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer;
-    font-family: var(--mono);
-  }
-  button.chip:hover { border-color: var(--k8s-blue); background: #143059; }
-  button.chip.danger:hover { border-color: var(--red); background: #3a1417; }
+  input:focus, select:focus, textarea:focus { border-color: var(--k8s-blue); }
+  .row { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .switch { display:inline-flex; align-items:center; gap:8px; font-size: 13px; cursor:pointer; user-select:none; }
+  .switch input { width: 36px; height: 20px; appearance:none; background: var(--panel-3); border-radius: 999px; position: relative; cursor:pointer; transition:.2s; }
+  .switch input:checked { background: var(--green); }
+  .switch input::after { content:""; position:absolute; width:16px; height:16px; border-radius:50%; background:#fff; top:2px; left:2px; transition:.2s; }
+  .switch input:checked::after { left: 18px; }
 
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); padding: 0 15px 12px; }
-  .legend span { display: inline-flex; align-items: center; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size: 11px; padding: 2px 9px; border-radius: 999px; border:1px solid var(--border); }
+  .pill.ok { color: var(--green); border-color: rgba(63,185,80,.4); background: rgba(63,185,80,.08); }
+  .pill.no { color: var(--red); border-color: rgba(248,81,73,.4); background: rgba(248,81,73,.08); }
+  .pill.warn { color: var(--amber); border-color: rgba(210,153,34,.4); background: rgba(210,153,34,.08); }
+  .pill.info { color: var(--cyan); border-color: rgba(86,212,221,.4); background: rgba(86,212,221,.08); }
+
+  .card-btn { text-align:left; background: var(--panel); border:1px solid var(--border); border-radius: 12px; padding: 16px; cursor:pointer; transition:.15s; color:var(--text); font-family:var(--sans); }
+  .card-btn:hover { border-color: var(--k8s-blue); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.35); }
+  .card-btn h3 { margin: 0 0 6px; font-size: 15px; }
+  .card-btn p { margin:0; color: var(--muted); font-size: 12.5px; line-height:1.5; }
+  .card-btn .emoji { font-size: 20px; }
+
+  table { width:100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  th, td { text-align:left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size:10px; text-transform: uppercase; letter-spacing:.5px; }
+
+  .log { font-family: var(--mono); font-size: 12.5px; background:#0a0e14; border:1px solid var(--border); border-radius: 10px; padding: 12px; min-height: 120px; max-height: 320px; overflow-y:auto; white-space: pre-wrap; line-height:1.55; }
+  .log .ok { color: var(--green); } .log .err { color: var(--red); } .log .muted { color: var(--muted); } .log .info { color: var(--cyan); } .log .warn { color: var(--amber); }
+
+  /* Architecture diagram */
+  .arch { display:grid; gap: 16px; }
+  .arch .plane { border:1px dashed var(--border); border-radius: 12px; padding: 14px; position: relative; }
+  .arch .plane .lbl { position:absolute; top:-10px; left: 14px; background: var(--bg); padding: 0 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing:.5px; }
+  .comp-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 10px; }
+  .comp { border:1px solid var(--border); border-radius: 10px; padding: 12px; cursor:pointer; background: var(--panel-2); transition:.15s; }
+  .comp:hover { border-color: var(--k8s-blue); transform: translateY(-2px); }
+  .comp.sel { border-color: var(--k8s-blue); box-shadow: 0 0 0 1px var(--k8s-blue) inset; }
+  .comp .cn { font-weight:600; font-size: 13px; display:flex; align-items:center; gap:8px; }
+  .comp .cd { color: var(--muted); font-size: 11.5px; margin-top: 4px; line-height: 1.4; }
+  .comp.flash { animation: flash 1s ease; }
+  @keyframes flash { 0%,100%{ box-shadow:none;} 40%{ box-shadow: 0 0 0 3px rgba(50,108,229,.6);} }
+
+  /* Request flow pipeline */
+  .pipeline { position: relative; display:flex; align-items:stretch; gap: 10px; overflow-x:auto; padding: 26px 6px 14px; }
+  .stage { flex: 1 0 120px; border:1px solid var(--border); border-radius: 10px; background: var(--panel-2); padding: 12px 10px; text-align:center; position: relative; transition:.2s; min-width: 120px; }
+  .stage .st-name { font-size: 12.5px; font-weight:600; }
+  .stage .st-sub { font-size: 10.5px; color: var(--muted); margin-top: 4px; min-height: 26px; }
+  .stage .st-icon { font-size: 20px; }
+  .stage.active { border-color: var(--k8s-blue); box-shadow: 0 0 0 2px rgba(50,108,229,.4); }
+  .stage.pass { border-color: var(--green); background: rgba(63,185,80,.08); }
+  .stage.fail { border-color: var(--red); background: rgba(248,81,73,.12); }
+  .stage .arrow { position:absolute; right:-11px; top:50%; transform: translateY(-50%); color: var(--border); font-size: 16px; z-index:1; }
+  #flow-token {
+    position: absolute; top: 2px; left: 0; width: 34px; height: 34px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--k8s-blue), #6ea8ff); display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 4px 14px rgba(50,108,229,.6); transition: transform 1s cubic-bezier(.5,.05,.3,1); z-index: 5; font-size: 16px;
+    opacity: 0;
+  }
+
+  .kv { display:grid; grid-template-columns: 130px 1fr; gap: 4px 10px; font-size: 12.5px; }
+  .kv div:nth-child(odd){ color: var(--muted); }
+  .findings .f { display:flex; gap:10px; align-items:flex-start; padding: 9px 10px; border:1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+  .sev { font-size:10px; font-weight:700; padding: 2px 7px; border-radius: 6px; flex: 0 0 auto; }
+  .sev.critical { background: rgba(248,81,73,.15); color: var(--red);} .sev.high { background: rgba(219,97,162,.15); color: var(--pink);} .sev.medium{ background: rgba(210,153,34,.15); color: var(--amber);} .sev.low{ background: rgba(86,212,221,.12); color: var(--cyan);} .sev.pass{ background: rgba(63,185,80,.15); color: var(--green);}
+  .score { font-size: 34px; font-weight: 800; }
+
+  /* topology (playground) */
+  .nodes { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 12px; }
+  .node { border:1px solid var(--border); border-radius:10px; background: linear-gradient(180deg,var(--panel-2),var(--panel)); padding:10px; min-height: 110px; }
+  .node .nh { display:flex; justify-content:space-between; margin-bottom:8px; }
+  .node .nn { font-family: var(--mono); font-size:12px; color: var(--cyan); }
+  .dot{ width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;}
+  .dot.Ready,.dot.Running{background:var(--green);box-shadow:0 0 6px var(--green);}
+  .dot.Pending{background:var(--amber);} .dot.ContainerCreating{background:var(--cyan);} .dot.Terminating{background:var(--red);}
+  .podz{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pod{ width:38px;height:38px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:#10233f;position:relative;transition:.12s;}
+  .pod svg{width:20px;height:20px;color:var(--muted);}
+  .pod.Running svg{color:var(--green);} .pod.Pending svg{color:var(--amber);} .pod.ContainerCreating svg{color:var(--cyan);animation:spin 1.3s linear infinite;} .pod.Terminating{opacity:.4;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #terminal{ font-family:var(--mono);font-size:12.5px;line-height:1.5;background:#0a0e14;padding:12px 14px;height:230px;overflow-y:auto;white-space:pre-wrap;border-radius:10px;border:1px solid var(--border);}
+  #terminal .prompt{color:var(--k8s-blue);} #terminal .err{color:var(--red);} #terminal .ok{color:var(--green);} #terminal .muted{color:var(--muted);}
+  .terminput{ display:flex;gap:8px;align-items:center;margin-top:8px; }
+  .terminput .prompt{color:var(--k8s-blue);font-family:var(--mono);}
+  #cmd{flex:1;background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:9px 10px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;}
+
+  /* reconcile / operator */
+  .recon { display:flex; flex-direction:column; gap:8px; }
+  .rstep{ display:flex; gap:10px; align-items:center; padding: 8px 10px; border:1px solid var(--border); border-radius:8px; opacity:.4; transition:.2s;}
+  .rstep.on{ opacity:1; border-color: var(--k8s-blue);}
+  .rstep.done{ opacity:1; border-color: var(--green);}
+  .rstep .rn{ font-size: 12.5px; }
+  .managed { display:flex; gap:10px; flex-wrap:wrap; }
+  .managed .m{ border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-family:var(--mono); font-size:12px; opacity:0; transform: scale(.9); transition:.25s; }
+  .managed .m.show{ opacity:1; transform:none; border-color: var(--green); }
+
+  /* quiz */
+  .quiz-opt{ display:block; width:100%; text-align:left; border:1px solid var(--border); background: var(--panel-2); color:var(--text); padding: 11px 14px; border-radius:8px; margin-bottom:8px; cursor:pointer; font-size:13.5px; font-family:var(--sans);}
+  .quiz-opt:hover{ border-color: var(--k8s-blue); }
+  .quiz-opt.correct{ border-color: var(--green); background: rgba(63,185,80,.12);}
+  .quiz-opt.wrong{ border-color: var(--red); background: rgba(248,81,73,.12);}
+  .expl{ margin-top:10px; padding: 10px 12px; border-left: 3px solid var(--k8s-blue); background: var(--panel-2); border-radius: 0 8px 8px 0; font-size: 13px; line-height:1.5; color:#cdd8e3; }
+
+  .flash-card{ perspective: 1200px; }
+  details.faq{ border:1px solid var(--border); border-radius:10px; margin-bottom:8px; background: var(--panel); }
+  details.faq summary{ cursor:pointer; padding: 12px 14px; font-weight:600; list-style:none; }
+  details.faq summary::-webkit-details-marker{ display:none; }
+  details.faq[open] summary{ border-bottom:1px solid var(--border); }
+  details.faq .a{ padding: 12px 14px; color:#cdd8e3; font-size:13px; line-height:1.55; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .tag2 { font-size:10px; color:var(--muted); border:1px solid var(--border); padding:1px 7px; border-radius:999px; }
+  .badge-count { background: var(--panel-3); color: var(--text); border-radius: 999px; font-size: 11px; padding: 1px 8px; }
 </style>
 </head>
 <body>
-<header>
-  <svg class="logo" viewBox="0 0 128 128" aria-hidden="true">
-    <path fill="#326ce5" d="M63.7 5.9 16.9 28.5a8 8 0 0 0-4.3 5.4L1.1 84.9a8 8 0 0 0 1.5 6.8l32.4 40.3a8 8 0 0 0 6.2 3h51.9a8 8 0 0 0 6.2-3l32.4-40.3a8 8 0 0 0 1.5-6.8l-11.6-51a8 8 0 0 0-4.3-5.4L70.5 5.9a8 8 0 0 0-6.8 0z" transform="scale(.9) translate(6 -1)"/>
-    <g fill="#fff">
-      <circle cx="64" cy="40" r="6"/><circle cx="64" cy="88" r="6"/>
-      <circle cx="40" cy="54" r="6"/><circle cx="88" cy="54" r="6"/>
-      <circle cx="44" cy="82" r="6"/><circle cx="84" cy="82" r="6"/>
-      <circle cx="64" cy="64" r="9"/>
-    </g>
-  </svg>
-  <div>
-    <h1><span>Kube</span>Lab</h1>
-  </div>
-  <span class="tag">simulated cluster · runs 100% in your browser</span>
-  <div class="spacer"></div>
-  <div class="cluster-stat">
-    <div><b id="stat-pods">0</b> pods running</div>
-    <div><span id="stat-deploys">0</span> deployments · <span id="stat-svcs">0</span> services</div>
-  </div>
-</header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 128 128"><path fill="#326ce5" d="M63.7 5.9 16.9 28.5a8 8 0 0 0-4.3 5.4L1.1 84.9a8 8 0 0 0 1.5 6.8l32.4 40.3a8 8 0 0 0 6.2 3h51.9a8 8 0 0 0 6.2-3l32.4-40.3a8 8 0 0 0 1.5-6.8l-11.6-51a8 8 0 0 0-4.3-5.4L70.5 5.9a8 8 0 0 0-6.8 0z" transform="scale(.9) translate(6 -1)"/><g fill="#fff"><circle cx="64" cy="40" r="6"/><circle cx="64" cy="88" r="6"/><circle cx="40" cy="54" r="6"/><circle cx="88" cy="54" r="6"/><circle cx="44" cy="82" r="6"/><circle cx="84" cy="82" r="6"/><circle cx="64" cy="64" r="9"/></g></svg>
+      <div><h1><span>Kube</span>Lab</h1><small>learn · explore · interview‑prep</small></div>
+    </div>
+    <nav id="nav">
+      <div class="navgroup">Learn</div>
+      <button data-view="overview"><span class="ic">🏠</span> Overview</button>
+      <button data-view="architecture"><span class="ic">🏗️</span> Architecture</button>
+      <button data-view="flow"><span class="ic">🌊</span> Request Flow</button>
+      <div class="navgroup">Security &amp; Policy</div>
+      <button data-view="rbac"><span class="ic">🔐</span> RBAC Lab</button>
+      <button data-view="security"><span class="ic">🛡️</span> Container Security</button>
+      <button data-view="opa"><span class="ic">⚖️</span> OPA / Admission</button>
+      <div class="navgroup">Extend &amp; Practice</div>
+      <button data-view="operators"><span class="ic">🤖</span> Operators &amp; CRDs</button>
+      <button data-view="playground"><span class="ic">💻</span> kubectl Playground</button>
+      <button data-view="interview"><span class="ic">🎓</span> Interview Prep</button>
+    </nav>
+    <div class="foot">100% client‑side simulator.<br/>No cluster, no data leaves your browser.</div>
+  </aside>
 
-<div class="layout">
-  <!-- Cluster visualization -->
-  <div class="panel">
-    <div class="panel-head">Cluster topology <span class="count" id="node-count"></span></div>
-    <div class="panel-body">
-      <div class="nodes" id="nodes"></div>
-    </div>
-    <div class="legend">
-      <span><span class="dot Running"></span>Running</span>
-      <span><span class="dot ContainerCreating"></span>ContainerCreating</span>
-      <span><span class="dot Pending"></span>Pending</span>
-      <span><span class="dot Terminating"></span>Terminating</span>
-    </div>
-  </div>
-
-  <!-- Resource tables -->
-  <div class="panel">
-    <div class="panel-head">Resources</div>
-    <div class="panel-body tables-wrap">
-      <div>
-        <div class="panel-head" style="background:transparent;border:none;padding:0 0 6px;">Deployments <span class="count" id="deploy-count"></span></div>
-        <div class="table-scroll"><table id="deploy-table"></table></div>
-      </div>
-      <div>
-        <div class="panel-head" style="background:transparent;border:none;padding:0 0 6px;">Services <span class="count" id="svc-count"></span></div>
-        <div class="table-scroll"><table id="svc-table"></table></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Terminal -->
-  <div class="panel term-panel">
-    <div class="panel-head">kubectl terminal <span class="count">type <code>help</code> to see commands</span></div>
-    <div id="terminal"></div>
-    <div class="term-input-row">
-      <span class="prompt">$</span>
-      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="kubectl get pods" />
-    </div>
-    <div class="toolbar">
-      <button class="chip" data-cmd="kubectl create deployment web --image=nginx --replicas=3">create nginx x3</button>
-      <button class="chip" data-cmd="kubectl scale deployment web --replicas=5">scale web to 5</button>
-      <button class="chip" data-cmd="kubectl expose deployment web --port=80 --type=NodePort">expose web</button>
-      <button class="chip" data-cmd="kubectl get all">get all</button>
-      <button class="chip" data-cmd="chaos">chaos: kill a pod</button>
-      <button class="chip danger" data-cmd="reset">reset cluster</button>
-    </div>
-  </div>
+  <main class="main">
+    <section class="view" id="view-overview"></section>
+    <section class="view" id="view-architecture"></section>
+    <section class="view" id="view-flow"></section>
+    <section class="view" id="view-rbac"></section>
+    <section class="view" id="view-security"></section>
+    <section class="view" id="view-opa"></section>
+    <section class="view" id="view-operators"></section>
+    <section class="view" id="view-playground"></section>
+    <section class="view" id="view-interview"></section>
+  </main>
 </div>
 
 <script>
 "use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// ---------------------------------------------------------------------------
-// KubeLab — a tiny in-browser Kubernetes control-plane simulator.
-// Everything (state, reconcile loop, kubectl parser) lives in this one file.
-// ---------------------------------------------------------------------------
-
-const CUBE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>';
-
-const LIFECYCLE = { PENDING: 800, CREATING: 1600 }; // ms offsets
-
-let podSeq = 0;
-let svcIpSeq = 10;
-let podIpSeq = 10;
-
-const state = {
-  nodes: [],
-  deployments: {}, // name -> {name, image, replicas, hash, labels}
-  pods: [],        // {name, deploy, image, status, node, ip, restarts, born}
-  services: {},    // name -> {name, type, selector, port, targetPort, clusterIP, nodePort}
+// ===========================================================================
+// SHARED APP STATE — the same identity / RBAC / OPA / pod spec feed the
+// Request Flow, RBAC, Security and OPA labs so the platform is cohesive.
+// ===========================================================================
+const APP = {
+  identity: "system:serviceaccount:default:deployer",
+  identities: ["dev-user", "ops-admin", "system:serviceaccount:default:deployer", "system:serviceaccount:default:web-sa"],
+  rbac: {
+    roles: {
+      "pod-reader": { rules: [{ apiGroups: [""], resources: ["pods"], verbs: ["get", "list", "watch"] }] },
+      "pod-creator": { rules: [{ apiGroups: [""], resources: ["pods"], verbs: ["create", "get", "list"] }] },
+      "deploy-admin": { rules: [{ apiGroups: ["apps"], resources: ["deployments"], verbs: ["*"] }] },
+      "cluster-admin": { rules: [{ apiGroups: ["*"], resources: ["*"], verbs: ["*"] }] },
+    },
+    bindings: [
+      { kind: "User", subject: "dev-user", role: "pod-reader" },
+      { kind: "User", subject: "ops-admin", role: "cluster-admin" },
+      { kind: "ServiceAccount", subject: "system:serviceaccount:default:deployer", role: "pod-creator" },
+    ],
+  },
+  opa: [
+    { id: "no-latest", name: "block :latest image tag", enabled: true, sev: "medium",
+      rego: 'violation[msg] {\n  endswith(input.image, ":latest")\n  msg := "images must not use the :latest tag"\n}',
+      check: p => (/:latest$/.test(p.image) || !p.image.includes(":")) ? "image uses :latest (or no) tag — pin an explicit version" : null },
+    { id: "require-label", name: "require 'app' label", enabled: true, sev: "low",
+      rego: 'violation[msg] {\n  not input.labels.app\n  msg := "every pod must carry an app label"\n}',
+      check: p => p.labels && p.labels.app ? null : "missing required label: app" },
+    { id: "no-privileged", name: "disallow privileged containers", enabled: true, sev: "critical",
+      rego: 'violation[msg] {\n  input.securityContext.privileged == true\n  msg := "privileged containers are not allowed"\n}',
+      check: p => p.privileged ? "privileged: true is forbidden by policy" : null },
+    { id: "run-as-nonroot", name: "require runAsNonRoot", enabled: false, sev: "high",
+      rego: 'violation[msg] {\n  not input.securityContext.runAsNonRoot\n  msg := "containers must set runAsNonRoot: true"\n}',
+      check: p => p.runAsNonRoot ? null : "runAsNonRoot must be true" },
+    { id: "require-limits", name: "require CPU/memory limits", enabled: false, sev: "medium",
+      rego: 'violation[msg] {\n  not input.resources.limits.cpu\n  msg := "cpu/memory limits are required"\n}',
+      check: p => (p.cpuLimit && p.memLimit) ? null : "resource limits (cpu & memory) are required" },
+  ],
+  podSpec: {
+    name: "web", image: "nginx:latest", labels: { app: "web" },
+    privileged: false, runAsNonRoot: false, allowPrivEsc: true, hostNetwork: false,
+    cpuLimit: "", memLimit: "", addedCaps: [],
+  },
 };
 
-function initCluster() {
-  state.nodes = [
-    { name: "kube-control-plane", role: "control-plane", status: "Ready" },
-    { name: "kube-worker-1", role: "<none>", status: "Ready" },
-    { name: "kube-worker-2", role: "<none>", status: "Ready" },
+// RBAC evaluation --------------------------------------------------------------
+function subjectKind(id) { return id.startsWith("system:serviceaccount:") ? "ServiceAccount" : "User"; }
+function authorize(subject, verb, resource, group = "") {
+  const b = APP.rbac.bindings.filter(x => x.subject === subject);
+  for (const bind of b) {
+    const role = APP.rbac.roles[bind.role];
+    if (!role) continue;
+    for (const r of role.rules) {
+      const g = r.apiGroups.includes("*") || r.apiGroups.includes(group);
+      const res = r.resources.includes("*") || r.resources.includes(resource);
+      const vb = r.verbs.includes("*") || r.verbs.includes(verb);
+      if (g && res && vb) return { allowed: true, via: bind.role, rule: r };
+    }
+  }
+  return { allowed: false };
+}
+
+// OPA / admission evaluation ---------------------------------------------------
+function evalPolicies(pod) {
+  return APP.opa.filter(p => p.enabled).map(p => {
+    const msg = p.check(pod);
+    return { id: p.id, name: p.name, sev: p.sev, ok: !msg, msg };
+  });
+}
+
+// Security scan ----------------------------------------------------------------
+function securityScan(p) {
+  const f = [];
+  if (p.privileged) f.push(["critical", "privileged: true", "Container runs with all host capabilities — full node compromise if breached. Set privileged:false."]);
+  if (p.addedCaps.includes("SYS_ADMIN")) f.push(["critical", "CAP_SYS_ADMIN added", "SYS_ADMIN is near‑root. Drop it; add only the minimal capabilities you need."]);
+  if (!p.runAsNonRoot) f.push(["high", "runs as root (runAsNonRoot not set)", "Set runAsNonRoot:true and a non‑zero runAsUser to reduce blast radius."]);
+  if (p.allowPrivEsc) f.push(["high", "allowPrivilegeEscalation not disabled", "Set allowPrivilegeEscalation:false to block setuid escalation."]);
+  if (p.hostNetwork) f.push(["high", "hostNetwork: true", "Pod shares the node network namespace — can sniff/spoof node traffic."]);
+  if (/:latest$/.test(p.image) || !p.image.includes(":")) f.push(["medium", "unpinned image tag (:latest)", "Pin a digest or explicit version for reproducible, auditable deploys."]);
+  if (!p.cpuLimit || !p.memLimit) f.push(["medium", "no resource limits", "Missing limits enable noisy‑neighbour & resource‑exhaustion DoS."]);
+  if (f.length === 0) f.push(["pass", "no major issues found", "This pod follows common hardening best practices. 🎉"]);
+  return f;
+}
+
+// ===========================================================================
+// VIEW: OVERVIEW
+// ===========================================================================
+function renderOverview() {
+  const cards = [
+    ["architecture", "🏗️", "Architecture &amp; Internals", "Click any control‑plane or node component to see what it does and how the pieces talk to each other."],
+    ["flow", "🌊", "Request Flow (animated)", "Watch a kubectl apply travel through the API server: authN → authZ → admission → etcd → scheduler → kubelet."],
+    ["rbac", "🔐", "RBAC Lab", "Create Roles &amp; bindings, then run <code>kubectl auth can‑i</code> and see allow/deny decisions explained."],
+    ["security", "🛡️", "Container Security", "Build a Pod securityContext and get a live hardening scan with severities and a security score."],
+    ["opa", "⚖️", "OPA / Admission Policies", "Toggle Gatekeeper‑style constraints (no :latest, no privileged, require labels…) and test admission."],
+    ["operators", "🤖", "Operators &amp; CRDs", "Apply a Custom Resource and watch an operator's reconcile loop create the managed resources."],
+    ["playground", "💻", "kubectl Playground", "A live simulated cluster: create, scale, expose, delete — pods self‑heal via the reconcile loop."],
+    ["interview", "🎓", "Interview Prep", "A scored multiple‑choice quiz plus a deep‑dive FAQ across all of the above topics."],
   ];
-  state.deployments = {};
-  state.pods = [];
-  state.services = {};
-  podSeq = 0; svcIpSeq = 10; podIpSeq = 10;
+  $("#view-overview").innerHTML = `
+    <h2 class="title">Interactive Kubernetes Learning Lab</h2>
+    <p class="subtitle">A hands‑on, 100% in‑browser environment to learn Kubernetes <b>internals</b>, <b>RBAC</b>, <b>container security</b>, <b>OPA/admission policies</b> and <b>operators</b> — with animated request flows so you can <i>see</i> how each request is processed. Great for building intuition and preparing for interviews.</p>
+    <div class="grid cols-2">
+      ${cards.map(c => `<button class="card-btn" data-goto="${c[0]}"><div class="emoji">${c[1]}</div><h3>${c[2]}</h3><p>${c[3]}</p></button>`).join("")}
+    </div>`;
+  $$("#view-overview [data-goto]").forEach(b => b.onclick = () => navigate(b.dataset.goto));
 }
 
-function rand(len) {
-  const c = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let s = "";
-  for (let i = 0; i < len; i++) s += c[Math.floor(Math.random() * c.length)];
-  return s;
-}
-
-function workerNodes() {
-  return state.nodes.filter(n => n.role !== "control-plane" && n.status === "Ready");
-}
-
-// Schedule a pod onto the worker node with the fewest pods.
-function scheduleNode() {
-  const workers = workerNodes();
-  if (workers.length === 0) return state.nodes[0].name;
-  const counts = {};
-  workers.forEach(w => counts[w.name] = 0);
-  state.pods.forEach(p => { if (counts[p.node] != null) counts[p.node]++; });
-  return workers.sort((a, b) => counts[a.name] - counts[b.name])[0].name;
-}
-
-function newPod(deploy) {
-  const d = state.deployments[deploy];
-  const pod = {
-    name: `${deploy}-${d.hash}-${rand(5)}`,
-    deploy,
-    image: d.image,
-    status: "Pending",
-    node: scheduleNode(),
-    ip: null,
-    restarts: 0,
-    born: Date.now() + (podSeq++),
-  };
-  state.pods.push(pod);
-  // Simulate the pod lifecycle: Pending -> ContainerCreating -> Running.
-  setTimeout(() => {
-    if (!state.pods.includes(pod)) return;
-    pod.status = "ContainerCreating";
-    render();
-  }, LIFECYCLE.PENDING);
-  setTimeout(() => {
-    if (!state.pods.includes(pod)) return;
-    pod.status = "Running";
-    pod.ip = `10.244.${Math.floor(podIpSeq / 254)}.${(podIpSeq++ % 254) + 1}`;
-    render();
-  }, LIFECYCLE.CREATING);
-  return pod;
-}
-
-function podsOf(deploy) {
-  return state.pods.filter(p => p.deploy === deploy && p.status !== "Terminating");
-}
-
-function terminatePod(pod) {
-  pod.status = "Terminating";
-  render();
-  setTimeout(() => {
-    state.pods = state.pods.filter(p => p !== pod);
-    render();
-  }, 700);
-}
-
-// The reconcile loop: make actual pod count converge to desired replicas.
-function reconcile() {
-  Object.values(state.deployments).forEach(d => {
-    const alive = podsOf(d.name);
-    if (alive.length < d.replicas) {
-      for (let i = alive.length; i < d.replicas; i++) newPod(d.name);
-    } else if (alive.length > d.replicas) {
-      const extra = alive
-        .sort((a, b) => b.born - a.born)
-        .slice(0, alive.length - d.replicas);
-      extra.forEach(terminatePod);
-    }
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Rendering
-// ---------------------------------------------------------------------------
-function render() {
-  renderNodes();
-  renderDeployTable();
-  renderSvcTable();
-  renderStats();
-}
-
-function renderStats() {
-  const running = state.pods.filter(p => p.status === "Running").length;
-  document.getElementById("stat-pods").textContent = running;
-  document.getElementById("stat-deploys").textContent = Object.keys(state.deployments).length;
-  document.getElementById("stat-svcs").textContent = Object.keys(state.services).length;
-  document.getElementById("node-count").textContent = `(${state.nodes.length} nodes)`;
-  document.getElementById("deploy-count").textContent = `(${Object.keys(state.deployments).length})`;
-  document.getElementById("svc-count").textContent = `(${Object.keys(state.services).length})`;
-}
-
-function renderNodes() {
-  const wrap = document.getElementById("nodes");
-  wrap.innerHTML = "";
-  state.nodes.forEach(node => {
-    const el = document.createElement("div");
-    el.className = "node";
-    const pods = state.pods.filter(p => p.node === node.name);
-    let podsHtml = pods.map(p => `
-      <div class="pod ${p.status}" title="${p.name}\n${p.image}\nstatus: ${p.status}\nnode: ${p.node}${p.ip ? "\nip: " + p.ip : ""}">
-        ${CUBE_SVG}${p.restarts ? `<span class="badge">↻${p.restarts}</span>` : ""}
-      </div>`).join("");
-    if (pods.length === 0) podsHtml = `<div class="empty-hint">no pods scheduled</div>`;
-    el.innerHTML = `
-      <div class="node-head">
-        <span class="node-name">${node.name}</span>
-        <span class="role"><span class="dot ${node.status}"></span>${node.role}</span>
-      </div>
-      <div class="pods">${podsHtml}</div>`;
-    wrap.appendChild(el);
-  });
-}
-
-function renderDeployTable() {
-  const t = document.getElementById("deploy-table");
-  const names = Object.keys(state.deployments);
-  if (names.length === 0) { t.innerHTML = `<tr><td class="muted" style="font-family:var(--sans);color:var(--muted)">No deployments. Try <code>kubectl create deployment web --image=nginx --replicas=3</code></td></tr>`; return; }
-  let rows = `<tr><th>Name</th><th>Ready</th><th>Up-to-date</th><th>Image</th></tr>`;
-  names.forEach(n => {
-    const d = state.deployments[n];
-    const ready = podsOf(n).filter(p => p.status === "Running").length;
-    rows += `<tr><td style="color:var(--cyan)">${n}</td><td>${ready}/${d.replicas}</td><td>${d.replicas}</td><td>${d.image}</td></tr>`;
-  });
-  t.innerHTML = rows;
-}
-
-function renderSvcTable() {
-  const t = document.getElementById("svc-table");
-  const names = Object.keys(state.services);
-  if (names.length === 0) { t.innerHTML = `<tr><td class="muted" style="font-family:var(--sans);color:var(--muted)">No services. Expose a deployment with <code>kubectl expose</code></td></tr>`; return; }
-  let rows = `<tr><th>Name</th><th>Type</th><th>Cluster-IP</th><th>Port(s)</th></tr>`;
-  names.forEach(n => {
-    const s = state.services[n];
-    const ports = s.type === "NodePort" ? `${s.port}:${s.nodePort}/TCP` : `${s.port}/TCP`;
-    rows += `<tr><td style="color:var(--cyan)">${n}</td><td>${s.type}</td><td>${s.clusterIP}</td><td>${ports}</td></tr>`;
-  });
-  t.innerHTML = rows;
-}
-
-// ---------------------------------------------------------------------------
-// Terminal
-// ---------------------------------------------------------------------------
-const termEl = document.getElementById("terminal");
-const history = [];
-let histIdx = -1;
-
-function print(text, cls = "out") {
-  const div = document.createElement("div");
-  div.className = cls;
-  div.textContent = text;
-  termEl.appendChild(div);
-  termEl.scrollTop = termEl.scrollHeight;
-}
-function printHTML(html, cls = "out") {
-  const div = document.createElement("div");
-  div.className = cls;
-  div.innerHTML = html;
-  termEl.appendChild(div);
-  termEl.scrollTop = termEl.scrollHeight;
-}
-function echoCmd(cmd) {
-  printHTML(`<span class="prompt">$</span> ${cmd.replace(/</g, "&lt;")}`, "cmd");
-}
-
-// Simple flag parser: returns {_: [positional], flag: value}
-function parseArgs(tokens) {
-  const out = { _: [] };
-  tokens.forEach(t => {
-    if (t.startsWith("--")) {
-      const [k, v] = t.slice(2).split("=");
-      out[k] = v === undefined ? true : v;
-    } else out._.push(t);
-  });
-  return out;
-}
-
-function pad(s, n) { s = String(s); return s + " ".repeat(Math.max(1, n - s.length)); }
-
-function ageOf(born) {
-  const secs = Math.max(0, Math.floor((Date.now() - born) / 1000));
-  if (secs < 60) return secs + "s";
-  if (secs < 3600) return Math.floor(secs / 60) + "m";
-  return Math.floor(secs / 3600) + "h";
-}
-
-const handlers = {
-  help() {
-    print("KubeLab supported commands:", "ok");
-    const lines = [
-      ["kubectl get nodes|pods|deployments|services|all", "list resources (add -o wide for pods)"],
-      ["kubectl create deployment <name> --image=<img> [--replicas=n]", "create a deployment"],
-      ["kubectl run <name> --image=<img>", "run a single pod deployment"],
-      ["kubectl scale deployment <name> --replicas=n", "change desired replicas"],
-      ["kubectl expose deployment <name> --port=n [--target-port=n] [--type=NodePort]", "create a Service"],
-      ["kubectl delete pod|deployment|service <name>", "delete a resource (pods self-heal)"],
-      ["kubectl describe pod|deployment <name>", "show resource detail"],
-      ["kubectl logs <pod>", "show fake pod logs"],
-      ["chaos", "kill a random pod and watch it recover"],
-      ["clear", "clear the terminal"],
-      ["reset", "reset the whole cluster"],
-    ];
-    lines.forEach(([c, d]) => printHTML(`  <span style="color:var(--cyan)">${pad(c, 62)}</span><span class="muted">${d}</span>`));
-  },
-
-  clear() { termEl.innerHTML = ""; },
-
-  reset() { initCluster(); render(); print("Cluster reset. 3 nodes ready, no workloads.", "ok"); },
-
-  chaos() {
-    const running = state.pods.filter(p => p.status === "Running" || p.status === "ContainerCreating");
-    if (running.length === 0) { print("No pods to disrupt. Create a deployment first.", "err"); return; }
-    const victim = running[Math.floor(Math.random() * running.length)];
-    print(`chaos: killing pod ${victim.name} on ${victim.node}`, "err");
-    terminatePod(victim);
-    print("The Deployment controller will reconcile and recreate it...", "muted");
-    setTimeout(reconcile, 800);
-  },
-
-  kubectl(tokens) {
-    const verb = tokens[0];
-    const rest = tokens.slice(1);
-    switch (verb) {
-      case "get": return kubectlGet(rest);
-      case "create": return kubectlCreate(rest);
-      case "run": return kubectlRun(rest);
-      case "scale": return kubectlScale(rest);
-      case "expose": return kubectlExpose(rest);
-      case "delete": return kubectlDelete(rest);
-      case "describe": return kubectlDescribe(rest);
-      case "logs": return kubectlLogs(rest);
-      case "version":
-        return print("Client Version: v1.30.0 (KubeLab)\nServer Version: v1.30.0 (simulated)", "out");
-      default:
-        print(`error: unknown kubectl command "${verb || ""}". Try "help".`, "err");
-    }
-  },
+// ===========================================================================
+// VIEW: ARCHITECTURE
+// ===========================================================================
+const COMPONENTS = {
+  "kube-apiserver": { icon: "🚪", plane: "cp", desc: "Front door of the cluster",
+    detail: "The <b>only</b> component that talks to etcd. It's a REST API server that validates and configures data for API objects (pods, services, etc.). Every request — from kubectl, controllers, or kubelets — flows through it and passes authentication, authorization and admission control before being persisted.",
+    talks: "kubectl, controllers, schedulers, kubelets ⇄ apiserver ⇄ etcd", iq: "Q: What is the only component that writes to etcd? A: the kube‑apiserver." },
+  "etcd": { icon: "🗄️", plane: "cp", desc: "Cluster key‑value store",
+    detail: "A consistent, distributed key‑value store (Raft) that is the single source of truth for all cluster state. Losing etcd = losing the cluster, so it's backed up regularly. Only the apiserver reads/writes it.",
+    talks: "kube‑apiserver ⇄ etcd (mTLS)", iq: "Q: Why should you back up etcd? A: it holds ALL cluster state; restoring it restores the cluster." },
+  "kube-scheduler": { icon: "📌", plane: "cp", desc: "Assigns pods to nodes",
+    detail: "Watches for newly created Pods with no assigned node and selects the best node via <i>filtering</i> (does it fit? taints/affinity?) then <i>scoring</i> (spread, resources). It only sets <code>pod.spec.nodeName</code> — the kubelet does the actual work.",
+    talks: "watches apiserver → binds pod to node", iq: "Q: Does the scheduler start containers? A: No — it only decides placement; the kubelet starts them." },
+  "kube-controller-manager": { icon: "🔁", plane: "cp", desc: "Runs controllers (reconcile loops)",
+    detail: "Runs the built‑in controllers (Deployment, ReplicaSet, Node, Job, endpoints…). Each controller watches desired vs actual state and drives actual toward desired — the core <b>reconciliation</b> pattern.",
+    talks: "watches & updates objects via apiserver", iq: "Q: How does a Deployment recover a deleted pod? A: the ReplicaSet controller reconciles actual→desired and creates a new one." },
+  "cloud-controller-manager": { icon: "☁️", plane: "cp", desc: "Cloud provider integration",
+    detail: "Bridges the cluster to a cloud provider's APIs: provisions LoadBalancers, manages node lifecycle, and wires up routes. Split out from the controller‑manager so cloud code evolves independently.",
+    talks: "apiserver ⇄ cloud provider API", iq: "Q: What creates an external LoadBalancer for a Service type=LoadBalancer? A: the cloud‑controller‑manager." },
+  "kubelet": { icon: "🧑‍✈️", plane: "node", desc: "Node agent",
+    detail: "The primary agent on every node. It watches the apiserver for pods bound to its node, then tells the container runtime (via CRI) to pull images and run containers. Reports pod/node status back and runs liveness/readiness probes.",
+    talks: "apiserver ⇄ kubelet ⇄ container runtime (CRI)", iq: "Q: What runs the containers? A: the container runtime, instructed by the kubelet over the CRI." },
+  "kube-proxy": { icon: "🔀", plane: "node", desc: "Service networking",
+    detail: "Maintains network rules (iptables/IPVS/eBPF) on each node so traffic to a Service's ClusterIP is load‑balanced to the right pod endpoints. Implements the Service abstraction at the data plane.",
+    talks: "watches Services/Endpoints → programs node netfilter", iq: "Q: How does a ClusterIP reach a pod? A: kube‑proxy DNATs it to a healthy endpoint." },
+  "container-runtime": { icon: "📦", plane: "node", desc: "Runs containers (CRI)",
+    detail: "Software that actually runs containers — containerd or CRI‑O. The kubelet speaks to it through the Container Runtime Interface (CRI). It pulls images, creates namespaces/cgroups, and starts processes.",
+    talks: "kubelet ⇄ runtime ⇄ Linux kernel (namespaces, cgroups)", iq: "Q: Is Docker required? A: No — any CRI‑compatible runtime like containerd works." },
 };
-
-function kubectlGet(rest) {
-  const args = parseArgs(rest);
-  const kind = (args._[0] || "").replace(/s$/, "");
-  const wide = args.o === "wide";
-  if (["node", "no"].includes(kind)) {
-    print(pad("NAME", 22) + pad("STATUS", 9) + pad("ROLES", 16) + "VERSION");
-    state.nodes.forEach(n => print(pad(n.name, 22) + pad(n.status, 9) + pad(n.role, 16) + "v1.30.0"));
-    return;
-  }
-  if (["pod", "po"].includes(kind)) {
-    if (state.pods.length === 0) return print("No resources found in default namespace.", "muted");
-    let header = pad("NAME", 30) + pad("READY", 7) + pad("STATUS", 18) + pad("RESTARTS", 10) + "AGE";
-    if (wide) header += pad("", 0) + "   " + pad("IP", 16) + "NODE";
-    print(header);
-    state.pods.forEach(p => {
-      const ready = p.status === "Running" ? "1/1" : "0/1";
-      let line = pad(p.name, 30) + pad(ready, 7) + pad(p.status, 18) + pad(p.restarts, 10) + ageOf(p.born);
-      if (wide) line += "   " + pad(p.ip || "<none>", 16) + p.node;
-      print(line);
-    });
-    return;
-  }
-  if (["deployment", "deploy"].includes(kind)) return renderGetDeploy();
-  if (["service", "svc"].includes(kind)) return renderGetSvc();
-  if (kind === "all") {
-    renderGetDeploy(); print(""); kubectlGet(["pods"]); print(""); renderGetSvc();
-    return;
-  }
-  print(`error: the server doesn't have a resource type "${args._[0] || ""}"`, "err");
+let selectedComp = null;
+function renderArchitecture() {
+  const comp = (k) => `<div class="comp ${selectedComp===k?'sel':''}" data-comp="${k}"><div class="cn">${COMPONENTS[k].icon} ${k}</div><div class="cd">${COMPONENTS[k].desc}</div></div>`;
+  const cp = Object.keys(COMPONENTS).filter(k => COMPONENTS[k].plane === "cp");
+  const nd = Object.keys(COMPONENTS).filter(k => COMPONENTS[k].plane === "node");
+  const sel = selectedComp ? COMPONENTS[selectedComp] : null;
+  $("#view-architecture").innerHTML = `
+    <h2 class="title">Architecture &amp; Internals</h2>
+    <p class="subtitle">Kubernetes is a set of <b>control‑plane</b> components (the brain) and <b>node</b> components (the muscle) that cooperate through the API server. Click any box to deep‑dive.</p>
+    <div class="grid cols-2">
+      <div class="arch">
+        <div class="plane"><span class="lbl">Control plane</span><div class="comp-grid">${cp.map(comp).join("")}</div></div>
+        <div class="plane"><span class="lbl">Worker node</span><div class="comp-grid">${nd.map(comp).join("")}</div></div>
+      </div>
+      <div class="panel">
+        <div class="ph">Deep dive ${sel?`<span class="tag2">${selectedComp}</span>`:""}</div>
+        <div class="pb" id="arch-detail">${sel ? `
+          <div style="font-size:34px">${sel.icon}</div>
+          <h3 style="margin:6px 0">${selectedComp}</h3>
+          <p style="line-height:1.6;color:#cdd8e3">${sel.detail}</p>
+          <label class="fld">Communication</label><div class="mono" style="font-size:12.5px">${sel.talks}</div>
+          <div class="expl" style="margin-top:14px">${sel.iq}</div>
+        ` : `<p class="hint">Select a component on the left to see its responsibilities, how it communicates, and a common interview question.</p>`}</div>
+      </div>
+    </div>`;
+  $$("#view-architecture [data-comp]").forEach(b => b.onclick = () => { selectedComp = b.dataset.comp; renderArchitecture(); });
 }
 
-function renderGetDeploy() {
-  const names = Object.keys(state.deployments);
-  if (names.length === 0) return print("No deployments found.", "muted");
-  print(pad("NAME", 16) + pad("READY", 8) + pad("UP-TO-DATE", 12) + pad("AVAILABLE", 11) + "AGE");
-  names.forEach(n => {
-    const d = state.deployments[n];
-    const ready = podsOf(n).filter(p => p.status === "Running").length;
-    print(pad(n, 16) + pad(`${ready}/${d.replicas}`, 8) + pad(d.replicas, 12) + pad(ready, 11) + ageOf(d.born));
-  });
+// ===========================================================================
+// VIEW: REQUEST FLOW (the animated centerpiece)
+// ===========================================================================
+const FLOW_STAGES = [
+  { id: "client", name: "kubectl", icon: "💻", sub: "client sends request" },
+  { id: "authn", name: "Authentication", icon: "🪪", sub: "who are you?" },
+  { id: "authz", name: "Authorization", icon: "🔐", sub: "RBAC: are you allowed?" },
+  { id: "mutate", name: "Mutating Admission", icon: "✏️", sub: "defaults / sidecars" },
+  { id: "validate", name: "Validating Admission", icon: "⚖️", sub: "OPA / PodSecurity" },
+  { id: "etcd", name: "etcd", icon: "🗄️", sub: "persist desired state" },
+  { id: "schedule", name: "Scheduler", icon: "📌", sub: "assign a node" },
+  { id: "kubelet", name: "kubelet", icon: "🧑‍✈️", sub: "start containers" },
+];
+function renderFlow() {
+  $("#view-flow").innerHTML = `
+    <h2 class="title">Request Flow — how a request is processed</h2>
+    <p class="subtitle">Submit <code>kubectl apply</code> for a Pod and watch it travel through the API server pipeline. The result at each gate depends on the <b>identity</b>, your <b>RBAC</b> rules and the enabled <b>OPA policies</b> — change them in their labs and re‑run here.</p>
+    <div class="panel" style="margin-bottom:16px"><div class="pb">
+      <div class="row">
+        <div style="flex:1;min-width:200px"><label class="fld">Request identity (subject)</label>
+          <select id="flow-id">${APP.identities.map(i => `<option ${i===APP.identity?"selected":""}>${i}</option>`).join("")}</select></div>
+        <div style="flex:1;min-width:160px"><label class="fld">Verb / resource</label><input type="text" value="create pods" disabled></div>
+        <div style="align-self:flex-end"><button class="btn" id="flow-run">▶ Submit request</button></div>
+      </div>
+      <div class="hint" style="margin-top:8px">Pod: <code id="flow-podsummary"></code></div>
+    </div></div>
+    <div class="panel"><div class="pb">
+      <div class="pipeline" id="pipeline">
+        <div id="flow-token">📦</div>
+        ${FLOW_STAGES.map((s,i)=>`<div class="stage" id="stage-${s.id}"><div class="st-icon">${s.icon}</div><div class="st-name">${s.name}</div><div class="st-sub" id="sub-${s.id}">${s.sub}</div>${i<FLOW_STAGES.length-1?'<div class="arrow">›</div>':''}</div>`).join("")}
+      </div>
+    </div></div>
+    <div class="grid cols-2" style="margin-top:16px">
+      <div class="panel"><div class="ph">Decision log</div><div class="pb"><div class="log" id="flow-log"><span class="muted">Click “Submit request” to trace the request…</span></div></div></div>
+      <div class="panel"><div class="ph">What happens here?</div><div class="pb" id="flow-explain"><p class="hint">Each stage lights up as the request reaches it. Green = passed, red = rejected (the request stops there, exactly like a real API server short‑circuits on the first failing gate).</p></div></div>
+    </div>`;
+  $("#flow-id").onchange = e => { APP.identity = e.target.value; };
+  $("#flow-podsummary").textContent = `${APP.podSpec.name} image=${APP.podSpec.image} labels=${JSON.stringify(APP.podSpec.labels)} privileged=${APP.podSpec.privileged}`;
+  $("#flow-run").onclick = runFlow;
 }
-
-function renderGetSvc() {
-  const names = Object.keys(state.services);
-  if (names.length === 0) return print("No services found.", "muted");
-  print(pad("NAME", 16) + pad("TYPE", 12) + pad("CLUSTER-IP", 16) + pad("PORT(S)", 16) + "AGE");
-  names.forEach(n => {
-    const s = state.services[n];
-    const ports = s.type === "NodePort" ? `${s.port}:${s.nodePort}/TCP` : `${s.port}/TCP`;
-    print(pad(n, 16) + pad(s.type, 12) + pad(s.clusterIP, 16) + pad(ports, 16) + ageOf(s.born));
-  });
+function flowLog(msg, cls = "") { const l = $("#flow-log"); l.innerHTML += `<div class="${cls}">${msg}</div>`; l.scrollTop = l.scrollHeight; }
+async function moveToken(stageId) {
+  const token = $("#flow-token"); const stage = $("#stage-" + stageId); const pipe = $("#pipeline");
+  const pr = pipe.getBoundingClientRect(); const sr = stage.getBoundingClientRect();
+  const x = sr.left - pr.left + pipe.scrollLeft + sr.width / 2 - 17;
+  token.style.opacity = "1";
+  token.style.transform = `translateX(${x}px)`;
+  await sleep(950);
 }
+async function runFlow() {
+  const btn = $("#flow-run"); btn.disabled = true;
+  $$(".stage").forEach(s => s.className = "stage");
+  $("#flow-log").innerHTML = ""; $("#flow-token").style.opacity = "0"; $("#flow-token").style.transform = "translateX(0)";
+  const p = APP.podSpec; let blocked = false;
+  const setSub = (id, t) => $("#sub-" + id).textContent = t;
+  const explain = h => $("#flow-explain").innerHTML = h;
 
-function createDeployment(name, image, replicas) {
-  if (state.deployments[name]) { print(`error: deployment "${name}" already exists`, "err"); return false; }
-  state.deployments[name] = {
-    name, image, replicas,
-    hash: rand(9),
-    born: Date.now(),
-    labels: { app: name },
-  };
-  reconcile();
-  return true;
-}
+  flowLog(`→ POST /api/v1/namespaces/default/pods  (as ${APP.identity})`, "info");
+  await sleep(300);
 
-function kubectlCreate(rest) {
-  const args = parseArgs(rest);
-  const sub = args._[0];
-  if (sub !== "deployment" && sub !== "deploy") return print("error: only 'create deployment' is supported", "err");
-  const name = args._[1];
-  if (!name) return print("error: NAME is required", "err");
-  if (!args.image) return print("error: --image is required", "err");
-  const replicas = parseInt(args.replicas || "1", 10);
-  if (createDeployment(name, args.image, replicas))
-    print(`deployment.apps/${name} created`, "ok");
-}
+  // client
+  $("#stage-client").classList.add("active"); await moveToken("client");
+  $("#stage-client").classList.remove("active"); $("#stage-client").classList.add("pass");
+  flowLog("kubectl serialized the Pod manifest and sent it over TLS to kube‑apiserver.", "muted");
 
-function kubectlRun(rest) {
-  const args = parseArgs(rest);
-  const name = args._[0];
-  if (!name) return print("error: NAME is required", "err");
-  if (!args.image) return print("error: --image is required", "err");
-  if (createDeployment(name, args.image, 1)) print(`pod/${name} created`, "ok");
-}
+  // authn
+  $("#stage-authn").classList.add("active"); await moveToken("authn");
+  const kind = subjectKind(APP.identity);
+  setSub("authn", kind + " identified");
+  $("#stage-authn").classList.replace("active", "pass") || $("#stage-authn").classList.add("pass");
+  flowLog(`AuthN ✓ identity established as ${kind}: ${APP.identity}`, "ok");
+  explain(`<b>Authentication</b> answers <i>“who are you?”</i> using client certs, bearer tokens, ServiceAccount tokens or OIDC. It does <b>not</b> decide permissions — that's the next stage. Here the request is a <code>${kind}</code>.`);
 
-function kubectlScale(rest) {
-  const args = parseArgs(rest);
-  if (args._[0] !== "deployment" && args._[0] !== "deploy") return print("error: usage: kubectl scale deployment <name> --replicas=n", "err");
-  const name = args._[1];
-  const d = state.deployments[name];
-  if (!d) return print(`error: deployments.apps "${name}" not found`, "err");
-  if (args.replicas === undefined) return print("error: --replicas is required", "err");
-  d.replicas = Math.max(0, parseInt(args.replicas, 10));
-  reconcile();
-  print(`deployment.apps/${name} scaled`, "ok");
-}
-
-function kubectlExpose(rest) {
-  const args = parseArgs(rest);
-  if (args._[0] !== "deployment" && args._[0] !== "deploy") return print("error: usage: kubectl expose deployment <name> --port=n", "err");
-  const name = args._[1];
-  const d = state.deployments[name];
-  if (!d) return print(`error: deployments.apps "${name}" not found`, "err");
-  if (args.port === undefined) return print("error: --port is required", "err");
-  if (state.services[name]) return print(`error: service "${name}" already exists`, "err");
-  const type = args.type || "ClusterIP";
-  state.services[name] = {
-    name, type,
-    selector: { app: name },
-    port: parseInt(args.port, 10),
-    targetPort: parseInt(args["target-port"] || args.port, 10),
-    clusterIP: `10.96.${Math.floor(svcIpSeq / 254)}.${(svcIpSeq++ % 254) + 1}`,
-    nodePort: type === "NodePort" ? 30000 + Math.floor(Math.random() * 2768) : null,
-    born: Date.now(),
-  };
-  render();
-  print(`service/${name} exposed`, "ok");
-}
-
-function kubectlDelete(rest) {
-  const args = parseArgs(rest);
-  const kind = (args._[0] || "").replace(/s$/, "");
-  const name = args._[1];
-  if (!name) return print("error: resource name required", "err");
-  if (["pod", "po"].includes(kind)) {
-    const pod = state.pods.find(p => p.name === name && p.status !== "Terminating");
-    if (!pod) return print(`error: pods "${name}" not found`, "err");
-    terminatePod(pod);
-    print(`pod "${name}" deleted`, "ok");
-    setTimeout(reconcile, 800); // Deployment recreates it -> self-healing.
-    return;
-  }
-  if (["deployment", "deploy"].includes(kind)) {
-    if (!state.deployments[name]) return print(`error: deployments.apps "${name}" not found`, "err");
-    delete state.deployments[name];
-    state.pods.filter(p => p.deploy === name).forEach(terminatePod);
-    print(`deployment.apps "${name}" deleted`, "ok");
-    return;
-  }
-  if (["service", "svc"].includes(kind)) {
-    if (!state.services[name]) return print(`error: services "${name}" not found`, "err");
-    delete state.services[name];
-    render();
-    print(`service "${name}" deleted`, "ok");
-    return;
-  }
-  print(`error: unknown resource type "${args._[0]}"`, "err");
-}
-
-function kubectlDescribe(rest) {
-  const args = parseArgs(rest);
-  const kind = (args._[0] || "").replace(/s$/, "");
-  const name = args._[1];
-  if (["deployment", "deploy"].includes(kind)) {
-    const d = state.deployments[name];
-    if (!d) return print(`error: deployments.apps "${name}" not found`, "err");
-    const ready = podsOf(name).filter(p => p.status === "Running").length;
-    print(`Name:                   ${d.name}
-Namespace:              default
-Selector:               app=${d.name}
-Replicas:               ${d.replicas} desired | ${ready} available
-Image:                  ${d.image}
-StrategyType:           RollingUpdate
-Pods:                   ${podsOf(name).map(p => p.name).join(", ") || "<none>"}`);
-    return;
-  }
-  if (["pod", "po"].includes(kind)) {
-    const p = state.pods.find(x => x.name === name);
-    if (!p) return print(`error: pods "${name}" not found`, "err");
-    print(`Name:         ${p.name}
-Namespace:    default
-Node:         ${p.node}
-Status:       ${p.status}
-IP:           ${p.ip || "<none>"}
-Controlled By: ReplicaSet/${p.deploy}-${state.deployments[p.deploy] ? state.deployments[p.deploy].hash : "?"}
-Image:        ${p.image}
-Restarts:     ${p.restarts}`);
-    return;
-  }
-  print("error: usage: kubectl describe pod|deployment <name>", "err");
-}
-
-function kubectlLogs(rest) {
-  const name = rest[0];
-  const p = state.pods.find(x => x.name === name);
-  if (!p) return print(`error: pods "${name}" not found`, "err");
-  if (p.status !== "Running") return print(`error: pod "${name}" is not running (status: ${p.status})`, "err");
-  const now = new Date().toISOString();
-  print(`${now} Starting ${p.image} ...
-${now} Server listening on 0.0.0.0:80
-${now} ${p.ip} - GET / 200 OK
-${now} ${p.ip} - GET /healthz 200 OK`);
-}
-
-function runCommand(raw) {
-  const cmd = raw.trim();
-  if (!cmd) return;
-  echoCmd(cmd);
-  history.push(cmd);
-  histIdx = history.length;
-  const tokens = cmd.split(/\s+/);
-  const head = tokens[0];
-  if (handlers[head]) {
-    try { handlers[head](tokens.slice(1)); }
-    catch (e) { print("internal error: " + e.message, "err"); }
+  // authz
+  $("#stage-authz").classList.add("active"); await moveToken("authz");
+  const az = authorize(APP.identity, "create", "pods", "");
+  if (az.allowed) {
+    $("#stage-authz").classList.replace("active", "pass"); $("#stage-authz").classList.add("pass");
+    setSub("authz", "allowed via " + az.via);
+    flowLog(`AuthZ ✓ RBAC allows create pods (via role “${az.via}”)`, "ok");
+    explain(`<b>Authorization (RBAC)</b> answers <i>“are you allowed to do this?”</i>. A binding maps <code>${APP.identity}</code> to role <code>${az.via}</code>, whose rule permits <code>create</code> on <code>pods</code>. Edit rules in the RBAC Lab.`);
   } else {
-    print(`command not found: ${head}. Type "help".`, "err");
+    $("#stage-authz").classList.add("fail"); setSub("authz", "FORBIDDEN"); blocked = "authz";
+    flowLog(`AuthZ ✗ Forbidden: ${APP.identity} cannot create pods (no matching RBAC rule)`, "err");
+    explain(`<b>Authorization denied.</b> No RoleBinding grants <code>${APP.identity}</code> the verb <code>create</code> on <code>pods</code>. The apiserver returns <code>403 Forbidden</code> and the request stops here. Grant access in the RBAC Lab (e.g. bind it to <code>pod-creator</code>).`);
   }
-  render();
+
+  if (!blocked) {
+    // mutating
+    $("#stage-mutate").classList.add("active"); await moveToken("mutate");
+    $("#stage-mutate").classList.replace("active", "pass"); $("#stage-mutate").classList.add("pass");
+    setSub("mutate", "defaults injected");
+    flowLog("Mutating admission ✓ injected default ServiceAccount, added labels, set imagePullPolicy.", "ok");
+    explain(`<b>Mutating admission webhooks</b> can <i>change</i> the object before it's stored — injecting sidecars (e.g. Istio), defaulting fields, adding labels. They run before validating webhooks.`);
+
+    // validating (OPA + podsecurity)
+    $("#stage-validate").classList.add("active"); await moveToken("validate");
+    const results = evalPolicies(p);
+    const violations = results.filter(r => !r.ok);
+    if (violations.length === 0) {
+      $("#stage-validate").classList.replace("active", "pass"); $("#stage-validate").classList.add("pass");
+      setSub("validate", "policies passed");
+      flowLog(`Validating admission ✓ ${results.length} OPA constraint(s) satisfied.`, "ok");
+      explain(`<b>Validating admission</b> (OPA/Gatekeeper, Pod Security) can only <i>accept or reject</i>. All ${results.length} enabled constraints passed. Toggle constraints in the OPA Lab to see rejections.`);
+    } else {
+      $("#stage-validate").classList.add("fail"); setSub("validate", violations.length + " violation(s)"); blocked = "validate";
+      violations.forEach(v => flowLog(`Validating admission ✗ [${v.name}] ${v.msg}`, "err"));
+      explain(`<b>Admission rejected</b> by policy. ${violations.map(v=>`<div style="margin-top:6px">• <b>${v.name}</b>: ${v.msg}</div>`).join("")}<div style="margin-top:8px">Fix the pod in the Security Lab or relax the policy in the OPA Lab, then re‑run.</div>`);
+    }
+  }
+
+  if (!blocked) {
+    $("#stage-etcd").classList.add("active"); await moveToken("etcd");
+    $("#stage-etcd").classList.replace("active", "pass"); $("#stage-etcd").classList.add("pass");
+    flowLog("etcd ✓ Pod object persisted as desired state (status: Pending).", "ok");
+    $("#stage-schedule").classList.add("active"); await moveToken("schedule");
+    $("#stage-schedule").classList.replace("active", "pass"); $("#stage-schedule").classList.add("pass");
+    const node = "kube-worker-" + (1 + Math.floor(Math.random() * 2));
+    setSub("schedule", "→ " + node);
+    flowLog(`Scheduler ✓ filtered + scored nodes, bound Pod to ${node}.`, "ok");
+    $("#stage-kubelet").classList.add("active"); await moveToken("kubelet");
+    $("#stage-kubelet").classList.replace("active", "pass"); $("#stage-kubelet").classList.add("pass");
+    setSub("kubelet", "Running");
+    flowLog(`kubelet on ${node} ✓ pulled ${p.image}, created container → Pod Running. 🎉`, "ok");
+    explain(`<b>Request admitted!</b> The desired state is in etcd. Controllers/scheduler/kubelet then <i>reconcile</i> reality to match: node bound, image pulled, container started. This watch‑reconcile loop is the heart of Kubernetes.`);
+  } else {
+    flowLog(`✗ Request rejected at the ${blocked === "authz" ? "Authorization" : "Validating Admission"} stage — nothing was written to etcd.`, "err");
+  }
+  btn.disabled = false;
 }
 
-// ---------------------------------------------------------------------------
-// Wiring
-// ---------------------------------------------------------------------------
-const input = document.getElementById("cmd");
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter") { runCommand(input.value); input.value = ""; }
-  else if (e.key === "ArrowUp") { if (histIdx > 0) { histIdx--; input.value = history[histIdx]; } e.preventDefault(); }
-  else if (e.key === "ArrowDown") { if (histIdx < history.length - 1) { histIdx++; input.value = history[histIdx]; } else { histIdx = history.length; input.value = ""; } e.preventDefault(); }
-});
+// ===========================================================================
+// VIEW: RBAC LAB
+// ===========================================================================
+let rbacTest = { subject: "dev-user", verb: "get", resource: "pods" };
+function renderRbac() {
+  const verbs = ["get", "list", "watch", "create", "update", "patch", "delete"];
+  const resources = ["pods", "deployments", "services", "secrets", "configmaps", "nodes"];
+  $("#view-rbac").innerHTML = `
+    <h2 class="title">RBAC Lab</h2>
+    <p class="subtitle">Role‑Based Access Control grants permissions through <b>Roles</b> (a set of allowed verbs on resources) bound to <b>subjects</b> (users / groups / ServiceAccounts) via <b>RoleBindings</b>. Build rules and test them with <code>can‑i</code>.</p>
+    <div class="grid cols-2">
+      <div class="panel"><div class="ph">Roles &amp; bindings <span class="badge-count">${APP.rbac.bindings.length} bindings</span></div><div class="pb">
+        <label class="fld">Roles</label>
+        <table><tr><th>Role</th><th>Rules (apiGroup / resources / verbs)</th></tr>
+        ${Object.entries(APP.rbac.roles).map(([n,r])=>`<tr><td style="color:var(--cyan)">${n}</td><td>${r.rules.map(x=>`${(x.apiGroups.join(",")||'core')} / ${x.resources.join(",")} / ${x.verbs.join(",")}`).join("<br>")}</td></tr>`).join("")}
+        </table>
+        <label class="fld">Bindings</label>
+        <table><tr><th>Kind</th><th>Subject</th><th>Role</th></tr>
+        ${APP.rbac.bindings.map((b,i)=>`<tr><td>${b.kind}</td><td>${b.subject}</td><td style="color:var(--cyan)">${b.role}</td></tr>`).join("")}
+        </table>
+        <label class="fld">Add a binding</label>
+        <div class="row">
+          <select id="rb-subj" style="flex:1">${APP.identities.map(i=>`<option>${i}</option>`).join("")}</select>
+          <span>→</span>
+          <select id="rb-role" style="flex:1">${Object.keys(APP.rbac.roles).map(r=>`<option>${r}</option>`).join("")}</select>
+          <button class="btn sm" id="rb-add">Bind</button>
+        </div>
+      </div></div>
+      <div class="panel"><div class="ph">kubectl auth can‑i</div><div class="pb">
+        <label class="fld">Subject</label><select id="ci-subj">${APP.identities.map(i=>`<option ${i===rbacTest.subject?"selected":""}>${i}</option>`).join("")}</select>
+        <div class="row" style="margin-top:8px">
+          <div style="flex:1"><label class="fld">Verb</label><select id="ci-verb">${verbs.map(v=>`<option ${v===rbacTest.verb?"selected":""}>${v}</option>`).join("")}</select></div>
+          <div style="flex:1"><label class="fld">Resource</label><select id="ci-res">${resources.map(v=>`<option ${v===rbacTest.resource?"selected":""}>${v}</option>`).join("")}</select></div>
+        </div>
+        <button class="btn" id="ci-run" style="margin-top:14px">▶ can‑i ?</button>
+        <div id="ci-result" style="margin-top:16px"></div>
+        <div class="expl" style="margin-top:14px"><b>Tip:</b> <code>secrets</code> access is a classic privilege‑escalation path — an attacker who can <code>get secrets</code> can often read ServiceAccount tokens. Try <code>dev-user get secrets</code> (denied) vs <code>ops-admin</code> (cluster‑admin, allowed).</div>
+      </div></div>
+    </div>`;
+  $("#rb-add").onclick = () => {
+    const s = $("#rb-subj").value, r = $("#rb-role").value;
+    APP.rbac.bindings.push({ kind: subjectKind(s), subject: s, role: r });
+    renderRbac();
+  };
+  $("#ci-run").onclick = async () => {
+    rbacTest = { subject: $("#ci-subj").value, verb: $("#ci-verb").value, resource: $("#ci-res").value };
+    const grp = rbacTest.resource === "deployments" ? "apps" : "";
+    const res = authorize(rbacTest.subject, rbacTest.verb, rbacTest.resource, grp);
+    const box = $("#ci-result");
+    box.innerHTML = `<div class="pill ${res.allowed?'ok':'no'}" style="font-size:14px;padding:8px 14px">${res.allowed?'yes ✓ allowed':'no ✗ forbidden'}</div>`;
+    box.innerHTML += res.allowed
+      ? `<p style="margin-top:10px">Subject <code>${rbacTest.subject}</code> can <code>${rbacTest.verb} ${rbacTest.resource}</code> — granted by role <b style="color:var(--cyan)">${res.via}</b>.</p>`
+      : `<p style="margin-top:10px">Subject <code>${rbacTest.subject}</code> is <b style="color:var(--red)">not</b> permitted to <code>${rbacTest.verb} ${rbacTest.resource}</code>. No bound role contains a matching rule. Bind it to a role that grants this verb.</p>`;
+  };
+}
 
-document.querySelectorAll("button.chip").forEach(btn => {
-  btn.addEventListener("click", () => {
-    input.value = btn.dataset.cmd;
-    runCommand(btn.dataset.cmd);
-    input.value = "";
-    input.focus();
+// ===========================================================================
+// VIEW: CONTAINER SECURITY
+// ===========================================================================
+function renderSecurity() {
+  const p = APP.podSpec;
+  $("#view-security").innerHTML = `
+    <h2 class="title">Container Security Lab</h2>
+    <p class="subtitle">Container security is about <b>least privilege</b>: don't run as root, drop capabilities, block privilege escalation, isolate the network, pin images and set limits. Configure a Pod's <code>securityContext</code> and scan it.</p>
+    <div class="grid cols-2">
+      <div class="panel"><div class="ph">Pod spec (shared with Flow &amp; OPA)</div><div class="pb">
+        <label class="fld">Name</label><input type="text" id="s-name" value="${p.name}">
+        <label class="fld">Image</label><input type="text" id="s-image" value="${p.image}">
+        <label class="fld">Label app=</label><input type="text" id="s-label" value="${p.labels.app||''}">
+        <div class="row" style="margin-top:14px">
+          <label class="switch"><input type="checkbox" id="s-priv" ${p.privileged?'checked':''}> privileged</label>
+          <label class="switch"><input type="checkbox" id="s-nonroot" ${p.runAsNonRoot?'checked':''}> runAsNonRoot</label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="switch"><input type="checkbox" id="s-priv-esc" ${p.allowPrivEsc?'checked':''}> allowPrivilegeEscalation</label>
+          <label class="switch"><input type="checkbox" id="s-hostnet" ${p.hostNetwork?'checked':''}> hostNetwork</label>
+        </div>
+        <label class="switch" style="margin-top:10px"><input type="checkbox" id="s-cap" ${p.addedCaps.includes('SYS_ADMIN')?'checked':''}> add capability SYS_ADMIN</label>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1"><label class="fld">CPU limit</label><input type="text" id="s-cpu" placeholder="e.g. 500m" value="${p.cpuLimit}"></div>
+          <div style="flex:1"><label class="fld">Memory limit</label><input type="text" id="s-mem" placeholder="e.g. 256Mi" value="${p.memLimit}"></div>
+        </div>
+        <button class="btn" id="s-scan" style="margin-top:16px">🛡️ Scan pod</button>
+      </div></div>
+      <div class="panel"><div class="ph">Scan result <span id="s-score-pill"></span></div><div class="pb">
+        <div style="text-align:center;margin-bottom:12px"><div class="score" id="s-score">—</div><div class="hint">security score</div></div>
+        <div class="findings" id="s-findings"><p class="hint">Configure the pod and click “Scan pod”. Changes here also affect the Request Flow and OPA labs.</p></div>
+      </div></div>
+    </div>`;
+  const sync = () => {
+    p.name = $("#s-name").value.trim() || "web";
+    p.image = $("#s-image").value.trim() || "nginx:latest";
+    const lab = $("#s-label").value.trim(); p.labels = lab ? { app: lab } : {};
+    p.privileged = $("#s-priv").checked; p.runAsNonRoot = $("#s-nonroot").checked;
+    p.allowPrivEsc = $("#s-priv-esc").checked; p.hostNetwork = $("#s-hostnet").checked;
+    p.addedCaps = $("#s-cap").checked ? ["SYS_ADMIN"] : [];
+    p.cpuLimit = $("#s-cpu").value.trim(); p.memLimit = $("#s-mem").value.trim();
+  };
+  $$("#view-security input").forEach(i => i.addEventListener("change", sync));
+  $("#s-scan").onclick = () => {
+    sync();
+    const f = securityScan(p);
+    const weights = { critical: 40, high: 20, medium: 10, low: 5, pass: 0 };
+    let score = 100; f.forEach(x => score -= (weights[x[0]] || 0)); score = Math.max(0, score);
+    $("#s-score").textContent = score;
+    $("#s-score").style.color = score >= 80 ? "var(--green)" : score >= 50 ? "var(--amber)" : "var(--red)";
+    $("#s-score-pill").innerHTML = `<span class="pill ${score>=80?'ok':score>=50?'warn':'no'}">${score>=80?'hardened':score>=50?'needs work':'insecure'}</span>`;
+    $("#s-findings").innerHTML = f.map(x => `<div class="f"><span class="sev ${x[0]}">${x[0].toUpperCase()}</span><div><b>${x[1]}</b><div class="hint" style="margin-top:3px">${x[2]}</div></div></div>`).join("");
+  };
+}
+
+// ===========================================================================
+// VIEW: OPA / ADMISSION
+// ===========================================================================
+let opaSelected = APP.opa[0].id;
+function renderOpa() {
+  const sel = APP.opa.find(o => o.id === opaSelected);
+  $("#view-opa").innerHTML = `
+    <h2 class="title">OPA / Admission Policy Lab</h2>
+    <p class="subtitle">Admission controllers enforce org policy at write‑time. <b>OPA Gatekeeper</b> evaluates <b>Rego</b> constraints as a <i>validating</i> webhook — if any constraint returns a violation, the object is rejected. Toggle policies, view their Rego, then test admission on the shared pod.</p>
+    <div class="grid cols-2">
+      <div class="panel"><div class="ph">Constraints <span class="badge-count">${APP.opa.filter(o=>o.enabled).length} enabled</span></div><div class="pb">
+        ${APP.opa.map(o=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--border);padding:8px 0">
+          <label class="switch"><input type="checkbox" data-opa="${o.id}" ${o.enabled?'checked':''}> ${o.name}</label>
+          <span class="row"><span class="sev ${o.sev}">${o.sev}</span><button class="btn sm ghost" data-rego="${o.id}">rego</button></span>
+        </div>`).join("")}
+        <label class="fld">Rego for “${sel.name}”</label>
+        <textarea rows="6" readonly id="opa-rego">${esc(sel.rego)}</textarea>
+      </div></div>
+      <div class="panel"><div class="ph">Test admission</div><div class="pb">
+        <div class="kv">
+          <div>name</div><div class="mono">${APP.podSpec.name}</div>
+          <div>image</div><div class="mono">${APP.podSpec.image}</div>
+          <div>labels</div><div class="mono">${JSON.stringify(APP.podSpec.labels)}</div>
+          <div>privileged</div><div class="mono">${APP.podSpec.privileged}</div>
+          <div>runAsNonRoot</div><div class="mono">${APP.podSpec.runAsNonRoot}</div>
+          <div>limits</div><div class="mono">${APP.podSpec.cpuLimit||'∅'} / ${APP.podSpec.memLimit||'∅'}</div>
+        </div>
+        <div class="hint" style="margin-top:6px">Edit these fields in the Container Security lab.</div>
+        <button class="btn" id="opa-test" style="margin-top:14px">⚖️ Evaluate admission</button>
+        <div id="opa-result" style="margin-top:16px"></div>
+      </div></div>
+    </div>`;
+  $$("#view-opa [data-opa]").forEach(c => c.onchange = () => { APP.opa.find(o=>o.id===c.dataset.opa).enabled = c.checked; renderOpa(); });
+  $$("#view-opa [data-rego]").forEach(b => b.onclick = () => { opaSelected = b.dataset.rego; renderOpa(); });
+  $("#opa-test").onclick = () => {
+    const results = evalPolicies(APP.podSpec);
+    const bad = results.filter(r => !r.ok);
+    const box = $("#opa-result");
+    if (results.length === 0) { box.innerHTML = `<span class="pill warn">no constraints enabled — admission allows everything</span>`; return; }
+    box.innerHTML = `<div class="pill ${bad.length?'no':'ok'}" style="font-size:14px;padding:8px 14px">${bad.length?`✗ admission DENIED (${bad.length})`:'✓ admission ALLOWED'}</div>`
+      + `<div class="findings" style="margin-top:12px">` + results.map(r => `<div class="f"><span class="sev ${r.ok?'pass':r.sev}">${r.ok?'PASS':'DENY'}</span><div><b>${r.name}</b>${r.ok?'':`<div class="hint" style="margin-top:3px">${r.msg}</div>`}</div></div>`).join("") + `</div>`;
+  };
+}
+
+// ===========================================================================
+// VIEW: OPERATORS & CRDs
+// ===========================================================================
+const operatorState = { applied: false };
+function renderOperators() {
+  $("#view-operators").innerHTML = `
+    <h2 class="title">Operators &amp; Custom Resources</h2>
+    <p class="subtitle">An <b>Operator</b> = a <b>CRD</b> (a new API type) + a <b>controller</b> that runs a reconcile loop. You declare a Custom Resource (desired state); the operator watches it and creates/updates the real Kubernetes objects that implement it. This is how you encode operational knowledge as software.</p>
+    <div class="grid cols-2">
+      <div class="panel"><div class="ph">Custom Resource: <span class="mono">Database</span> (CRD)</div><div class="pb">
+        <label class="fld">metadata.name</label><input type="text" id="op-name" value="orders-db">
+        <div class="row"><div style="flex:1"><label class="fld">spec.engine</label><select id="op-engine"><option>postgres</option><option>mysql</option><option>redis</option></select></div>
+        <div style="flex:1"><label class="fld">spec.replicas</label><input type="number" id="op-replicas" value="3" min="1" max="7"></div></div>
+        <label class="fld">Manifest</label>
+        <textarea rows="8" readonly id="op-yaml"></textarea>
+        <div class="row" style="margin-top:12px"><button class="btn" id="op-apply">▶ kubectl apply</button><button class="btn ghost" id="op-scale" disabled>edit replicas &amp; re‑reconcile</button></div>
+      </div></div>
+      <div class="panel"><div class="ph">Operator reconcile loop</div><div class="pb">
+        <div class="recon" id="op-steps">
+          ${["watch: observe Database CR","diff: compare desired vs actual","create StatefulSet (data pods)","create headless Service","create Secret (credentials)","update status.phase = Ready"].map((s,i)=>`<div class="rstep" id="rs-${i}"><span>${i+1}</span><span class="rn">${s}</span></div>`).join("")}
+        </div>
+        <label class="fld" style="margin-top:14px">Managed resources</label>
+        <div class="managed" id="op-managed">
+          <div class="m" id="m-sts">StatefulSet ✕</div><div class="m" id="m-svc">Service ✕</div><div class="m" id="m-sec">Secret ✕</div><div class="m" id="m-status">status: —</div>
+        </div>
+      </div></div>
+    </div>`;
+  const syncYaml = () => {
+    $("#op-yaml").value = `apiVersion: kubelab.io/v1\nkind: Database\nmetadata:\n  name: ${$("#op-name").value}\nspec:\n  engine: ${$("#op-engine").value}\n  replicas: ${$("#op-replicas").value}`;
+  };
+  ["op-name","op-engine","op-replicas"].forEach(id => $("#"+id).addEventListener("input", syncYaml));
+  syncYaml();
+  $("#op-apply").onclick = () => runReconcile(true);
+  $("#op-scale").onclick = () => runReconcile(false);
+}
+async function runReconcile(first) {
+  $("#op-apply").disabled = true; $("#op-scale").disabled = true;
+  const n = $("#op-name").value, eng = $("#op-engine").value, rep = $("#op-replicas").value;
+  for (let i = 0; i < 6; i++) { const s = $("#rs-"+i); s.className = "rstep"; }
+  const reveal = (id, txt) => { const m = $(id); m.textContent = txt; m.classList.add("show"); };
+  for (let i = 0; i < 6; i++) {
+    const s = $("#rs-" + i); s.classList.add("on"); await sleep(650);
+    if (i === 2) reveal("#m-sts", `StatefulSet ${n} (${rep} pods)`);
+    if (i === 3) reveal("#m-svc", `Service ${n}-headless`);
+    if (i === 4) reveal("#m-sec", `Secret ${n}-creds`);
+    if (i === 5) reveal("#m-status", `status: Ready ✓`);
+    s.classList.remove("on"); s.classList.add("done");
+  }
+  operatorState.applied = true; $("#op-apply").disabled = false; $("#op-scale").disabled = false;
+}
+
+// ===========================================================================
+// VIEW: PLAYGROUND (kubectl simulator + topology)
+// ===========================================================================
+const CUBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>';
+const cluster = { nodes: [], deployments: {}, pods: [], services: {} };
+let podSeq = 0, ipSeq = 10, svcSeq = 10, pgReady = false;
+function pgInit() {
+  cluster.nodes = [{ name: "kube-control-plane", role: "control-plane", status: "Ready" }, { name: "kube-worker-1", role: "<none>", status: "Ready" }, { name: "kube-worker-2", role: "<none>", status: "Ready" }];
+  cluster.deployments = {}; cluster.pods = []; cluster.services = {}; podSeq = 0; ipSeq = 10; svcSeq = 10;
+}
+function randStr(n){ const c="abcdefghijklmnopqrstuvwxyz0123456789"; let s=""; for(let i=0;i<n;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+function scheduleNode(){ const w=cluster.nodes.filter(n=>n.role!=="control-plane"); const cnt={}; w.forEach(x=>cnt[x.name]=0); cluster.pods.forEach(p=>{if(cnt[p.node]!=null)cnt[p.node]++;}); return w.sort((a,b)=>cnt[a.name]-cnt[b.name])[0].name; }
+function podsOf(d){ return cluster.pods.filter(p=>p.deploy===d&&p.status!=="Terminating"); }
+function newPod(deploy){ const d=cluster.deployments[deploy]; const pod={name:`${deploy}-${d.hash}-${randStr(5)}`,deploy,image:d.image,status:"Pending",node:scheduleNode(),ip:null,born:Date.now()+(podSeq++)}; cluster.pods.push(pod);
+  setTimeout(()=>{ if(!cluster.pods.includes(pod))return; pod.status="ContainerCreating"; pgRender(); },800);
+  setTimeout(()=>{ if(!cluster.pods.includes(pod))return; pod.status="Running"; pod.ip=`10.244.${Math.floor(ipSeq/254)}.${(ipSeq++%254)+1}`; pgRender(); },1600); }
+function terminate(pod){ pod.status="Terminating"; pgRender(); setTimeout(()=>{ cluster.pods=cluster.pods.filter(p=>p!==pod); pgRender(); },700); }
+function reconcilePG(){ Object.values(cluster.deployments).forEach(d=>{ const a=podsOf(d.name); if(a.length<d.replicas){ for(let i=a.length;i<d.replicas;i++) newPod(d.name);} else if(a.length>d.replicas){ a.sort((x,y)=>y.born-x.born).slice(0,a.length-d.replicas).forEach(terminate);} }); }
+function renderPlayground() {
+  $("#view-playground").innerHTML = `
+    <h2 class="title">kubectl Playground</h2>
+    <p class="subtitle">A live simulated cluster. Create deployments and watch pods schedule, then delete a pod and watch the reconcile loop <b>self‑heal</b> it. Type <code>help</code> for commands.</p>
+    <div class="grid cols-2">
+      <div class="panel"><div class="ph">Cluster topology</div><div class="pb"><div class="nodes" id="pg-nodes"></div></div></div>
+      <div class="panel"><div class="ph">Resources</div><div class="pb">
+        <label class="fld">Deployments</label><table id="pg-deploy"></table>
+        <label class="fld">Services</label><table id="pg-svc"></table>
+      </div></div>
+    </div>
+    <div class="panel" style="margin-top:16px"><div class="ph">kubectl terminal</div><div class="pb">
+      <div id="terminal"></div>
+      <div class="terminput"><span class="prompt">$</span><input id="cmd" autocomplete="off" spellcheck="false" placeholder="kubectl get pods"></div>
+      <div class="row" style="margin-top:10px">
+        ${[["create nginx x3","kubectl create deployment web --image=nginx --replicas=3"],["scale to 5","kubectl scale deployment web --replicas=5"],["expose","kubectl expose deployment web --port=80 --type=NodePort"],["get all","kubectl get all"],["chaos: kill pod","chaos"],["reset","reset"]].map(c=>`<button class="btn sm ghost" data-cmd="${c[1]}">${c[0]}</button>`).join("")}
+      </div>
+    </div></div>`;
+  if (!pgReady) { pgInit(); pgReady = true; }
+  const term = $("#terminal");
+  window.pgPrint = (t, c="") => { const d=document.createElement("div"); if(c)d.className=c; d.textContent=t; term.appendChild(d); term.scrollTop=term.scrollHeight; };
+  window.pgPrintHTML = (h, c="") => { const d=document.createElement("div"); if(c)d.className=c; d.innerHTML=h; term.appendChild(d); term.scrollTop=term.scrollHeight; };
+  const input = $("#cmd");
+  input.onkeydown = e => { if (e.key === "Enter") { pgRun(input.value); input.value=""; } };
+  $$("#view-playground [data-cmd]").forEach(b => b.onclick = () => { pgRun(b.dataset.cmd); input.focus(); });
+  term.innerHTML = "";
+  pgPrintHTML('<span class="ok">Playground ready.</span> 3 nodes Ready. Type <b>help</b> or click a button.', "");
+  pgRender();
+}
+function pgRender() {
+  if (!$("#pg-nodes")) return;
+  $("#pg-nodes").innerHTML = cluster.nodes.map(node => {
+    const pods = cluster.pods.filter(p => p.node === node.name);
+    const inner = pods.length ? pods.map(p=>`<div class="pod ${p.status}" title="${p.name}\n${p.image}\n${p.status}${p.ip?'\n'+p.ip:''}">${CUBE}</div>`).join("") : '<span class="hint">no pods</span>';
+    return `<div class="node"><div class="nh"><span class="nn">${node.name}</span><span class="hint"><span class="dot ${node.status}"></span>${node.role}</span></div><div class="podz">${inner}</div></div>`;
+  }).join("");
+  const dn = Object.keys(cluster.deployments);
+  $("#pg-deploy").innerHTML = dn.length ? `<tr><th>Name</th><th>Ready</th><th>Image</th></tr>` + dn.map(n=>{const d=cluster.deployments[n];const r=podsOf(n).filter(p=>p.status==="Running").length;return `<tr><td style="color:var(--cyan)">${n}</td><td>${r}/${d.replicas}</td><td>${d.image}</td></tr>`;}).join("") : `<tr><td class="hint">none — try create nginx x3</td></tr>`;
+  const sn = Object.keys(cluster.services);
+  $("#pg-svc").innerHTML = sn.length ? `<tr><th>Name</th><th>Type</th><th>Cluster-IP</th><th>Ports</th></tr>` + sn.map(n=>{const s=cluster.services[n];return `<tr><td style="color:var(--cyan)">${n}</td><td>${s.type}</td><td>${s.clusterIP}</td><td>${s.type==="NodePort"?s.port+":"+s.nodePort:s.port}/TCP</td></tr>`;}).join("") : `<tr><td class="hint">none</td></tr>`;
+}
+function pgArgs(t){ const o={_:[]}; t.forEach(x=>{ if(x.startsWith("--")){const[k,v]=x.slice(2).split("=");o[k]=v===undefined?true:v;} else o._.push(x); }); return o; }
+function pgRun(raw) {
+  const cmd = raw.trim(); if (!cmd) return;
+  pgPrintHTML(`<span class="prompt">$</span> ${esc(cmd)}`);
+  const t = cmd.split(/\s+/); const head = t[0];
+  try {
+    if (head === "help") { pgPrint("commands:", "ok"); ["kubectl get nodes|pods|deploy|svc|all","kubectl create deployment <n> --image=<i> [--replicas=k]","kubectl scale deployment <n> --replicas=k","kubectl expose deployment <n> --port=p [--type=NodePort]","kubectl delete pod|deployment <n>   (pods self-heal)","chaos · reset · clear"].forEach(l=>pgPrint("  "+l,"muted")); }
+    else if (head === "clear") { $("#terminal").innerHTML=""; }
+    else if (head === "reset") { pgInit(); pgPrint("cluster reset.","ok"); }
+    else if (head === "chaos") { const r=cluster.pods.filter(p=>p.status==="Running"); if(!r.length){pgPrint("no running pods.","err");} else { const v=r[Math.floor(Math.random()*r.length)]; pgPrint(`chaos: killing ${v.name}`,"err"); terminate(v); pgPrint("controller will recreate it...","muted"); setTimeout(reconcilePG,800);} }
+    else if (head === "kubectl") pgKubectl(t.slice(1));
+    else pgPrint(`command not found: ${head}`, "err");
+  } catch (e) { pgPrint("error: " + e.message, "err"); }
+  pgRender();
+}
+function pgKubectl(t) {
+  const verb = t[0], a = pgArgs(t.slice(1));
+  const pad=(s,n)=>{s=String(s);return s+" ".repeat(Math.max(1,n-s.length));};
+  if (verb === "get") {
+    const k=(a._[0]||"").replace(/s$/,"");
+    if(["node","no"].includes(k)){ pgPrint(pad("NAME",22)+pad("STATUS",9)+"ROLES"); cluster.nodes.forEach(n=>pgPrint(pad(n.name,22)+pad(n.status,9)+n.role)); return; }
+    if(["pod","po"].includes(k)){ if(!cluster.pods.length)return pgPrint("No resources found.","muted"); const wide=a.o==="wide"; pgPrint(pad("NAME",30)+pad("READY",7)+pad("STATUS",18)+(wide?pad("IP",16)+"NODE":"")); cluster.pods.forEach(p=>pgPrint(pad(p.name,30)+pad(p.status==="Running"?"1/1":"0/1",7)+pad(p.status,18)+(wide?pad(p.ip||"<none>",16)+p.node:""))); return; }
+    if(["deployment","deploy"].includes(k))return pgGetDeploy(pad);
+    if(["service","svc"].includes(k))return pgGetSvc(pad);
+    if(k==="all"){ pgGetDeploy(pad); pgKubectl(["get","pods"]); pgGetSvc(pad); return; }
+    return pgPrint(`unknown resource "${a._[0]||''}"`,"err");
+  }
+  if (verb === "create") { if(a._[0]!=="deployment"&&a._[0]!=="deploy")return pgPrint("only 'create deployment' supported","err"); const n=a._[1]; if(!n)return pgPrint("NAME required","err"); if(!a.image)return pgPrint("--image required","err"); if(cluster.deployments[n])return pgPrint(`deployment "${n}" exists`,"err"); cluster.deployments[n]={name:n,image:a.image,replicas:parseInt(a.replicas||"1",10),hash:randStr(9),born:Date.now()}; reconcilePG(); return pgPrint(`deployment.apps/${n} created`,"ok"); }
+  if (verb === "scale") { const n=a._[1]; const d=cluster.deployments[n]; if(!d)return pgPrint(`deployment "${n}" not found`,"err"); if(a.replicas===undefined)return pgPrint("--replicas required","err"); d.replicas=Math.max(0,parseInt(a.replicas,10)); reconcilePG(); return pgPrint(`deployment.apps/${n} scaled`,"ok"); }
+  if (verb === "expose") { const n=a._[1]; const d=cluster.deployments[n]; if(!d)return pgPrint(`deployment "${n}" not found`,"err"); if(a.port===undefined)return pgPrint("--port required","err"); const type=a.type||"ClusterIP"; cluster.services[n]={name:n,type,port:parseInt(a.port,10),clusterIP:`10.96.${Math.floor(svcSeq/254)}.${(svcSeq++%254)+1}`,nodePort:type==="NodePort"?30000+Math.floor(Math.random()*2768):null}; return pgPrint(`service/${n} exposed`,"ok"); }
+  if (verb === "delete") { const k=(a._[0]||"").replace(/s$/,""); const n=a._[1]; if(["pod","po"].includes(k)){ const p=cluster.pods.find(x=>x.name===n&&x.status!=="Terminating"); if(!p)return pgPrint(`pod "${n}" not found`,"err"); terminate(p); pgPrint(`pod "${n}" deleted`,"ok"); setTimeout(reconcilePG,800); return; } if(["deployment","deploy"].includes(k)){ if(!cluster.deployments[n])return pgPrint(`deployment "${n}" not found`,"err"); delete cluster.deployments[n]; cluster.pods.filter(p=>p.deploy===n).forEach(terminate); return pgPrint(`deployment "${n}" deleted`,"ok"); } return pgPrint(`unknown resource`,"err"); }
+  return pgPrint(`unknown kubectl command "${verb||''}"`,"err");
+}
+function pgGetDeploy(pad){ const n=Object.keys(cluster.deployments); if(!n.length)return pgPrint("No deployments.","muted"); pgPrint(pad("NAME",16)+pad("READY",8)+"IMAGE"); n.forEach(x=>{const d=cluster.deployments[x];const r=podsOf(x).filter(p=>p.status==="Running").length;pgPrint(pad(x,16)+pad(r+"/"+d.replicas,8)+d.image);}); }
+function pgGetSvc(pad){ const n=Object.keys(cluster.services); if(!n.length)return pgPrint("No services.","muted"); pgPrint(pad("NAME",16)+pad("TYPE",12)+pad("CLUSTER-IP",16)+"PORT"); n.forEach(x=>{const s=cluster.services[x];pgPrint(pad(x,16)+pad(s.type,12)+pad(s.clusterIP,16)+(s.type==="NodePort"?s.port+":"+s.nodePort:s.port)+"/TCP");}); }
+setInterval(()=>{ if($("#view-playground").classList.contains("active")) pgRender(); }, 1000);
+
+// ===========================================================================
+// VIEW: INTERVIEW PREP
+// ===========================================================================
+const QUIZ = [
+  { q: "Which component is the ONLY one that talks directly to etcd?", opts: ["kube-scheduler", "kube-apiserver", "kubelet", "kube-proxy"], a: 1, e: "The kube-apiserver is the single gateway to etcd. Everything else reads/writes cluster state through the apiserver." },
+  { q: "In the API request path, which stage runs LAST before the object is stored?", opts: ["Authentication", "Authorization", "Validating admission", "Mutating admission"], a: 2, e: "Order is AuthN → AuthZ → Mutating admission → Validating admission → persist. Validating (e.g. OPA) is the last gate and can only accept/reject." },
+  { q: "What restores a pod after you delete one that's managed by a Deployment?", opts: ["The scheduler", "kubelet", "The ReplicaSet controller reconciling", "etcd"], a: 2, e: "The ReplicaSet controller continuously reconciles actual vs desired replica count and creates a replacement — this is self-healing." },
+  { q: "RBAC: a subject can 'get secrets'. Why is this dangerous?", opts: ["Secrets are large", "It can read ServiceAccount tokens and escalate", "It deletes the cluster", "Nothing, it's read-only"], a: 1, e: "Reading secrets often exposes ServiceAccount tokens/credentials, a classic privilege-escalation path. Grant secret access narrowly." },
+  { q: "Which securityContext setting most reduces blast radius if a container is compromised?", opts: ["privileged: true", "runAsNonRoot: true", "hostNetwork: true", "allowPrivilegeEscalation: true"], a: 1, e: "Running as non-root (plus dropping capabilities and disabling privilege escalation) follows least privilege and limits what an attacker can do." },
+  { q: "OPA Gatekeeper enforces policy as which kind of admission webhook?", opts: ["Mutating", "Validating", "Authorization", "Authentication"], a: 1, e: "Gatekeeper is a validating admission webhook: it evaluates Rego constraints and rejects non-compliant objects (it doesn't mutate them)." },
+  { q: "An Operator is best described as…", opts: ["A managed cloud service", "A CRD plus a controller with a reconcile loop", "A type of Service", "A node agent"], a: 1, e: "Operators extend the API with a CRD and add a controller that reconciles the custom resource's desired state into real objects." },
+  { q: "What does kube-proxy program on each node?", opts: ["Container images", "iptables/IPVS rules for Service VIPs", "etcd snapshots", "Pod manifests"], a: 1, e: "kube-proxy watches Services/Endpoints and programs netfilter (iptables/IPVS/eBPF) so ClusterIP traffic load-balances to pod endpoints." },
+];
+let quizIdx = 0, quizScore = 0, quizAnswered = false;
+const FAQ = [
+  ["Walk me through what happens when I run `kubectl apply -f pod.yaml`.", "kubectl authenticates to the apiserver over TLS and POSTs the manifest. The apiserver runs Authentication → Authorization (RBAC) → Mutating admission → Validating admission (OPA/PodSecurity), then persists the desired state to etcd. The scheduler watches for unscheduled pods and binds one to a node; the kubelet on that node pulls the image via the CRI runtime and starts the container, reporting status back. Controllers keep reconciling actual→desired. (See the Request Flow tab for the animation.)"],
+  ["What's the difference between a Role and a ClusterRole?", "A Role is namespaced — its rules apply within one namespace. A ClusterRole is cluster-scoped and can grant access to cluster-scoped resources (nodes, PVs), non-resource URLs, or namespaced resources across all namespaces. RoleBinding binds within a namespace; ClusterRoleBinding binds cluster-wide."],
+  ["How does Kubernetes self-heal?", "Through reconciliation. Controllers watch objects and continuously drive actual state toward the declared desired state. If a pod dies, the ReplicaSet controller notices replicas < desired and creates a new one; if a node dies, pods are rescheduled elsewhere."],
+  ["What are the main container security best practices?", "Run as non-root (runAsNonRoot + runAsUser), set allowPrivilegeEscalation:false, drop ALL capabilities and add back only what's needed, avoid privileged and hostNetwork/hostPID, use read-only root filesystem, pin image digests, set resource limits, scan images, and enforce Pod Security Standards / OPA at admission."],
+  ["Mutating vs validating admission webhooks?", "Mutating webhooks run first and can modify the object (inject sidecars, set defaults). Validating webhooks run after and can only accept or reject. Both run after authN/authZ and before persistence. OPA Gatekeeper is typically validating."],
+  ["When would you write an Operator instead of using a Deployment?", "When managing a stateful or complex application needs domain-specific operational logic — e.g. ordered scaling, backups, failover, version upgrades for a database. The operator encodes that human runbook as a controller reconciling a CRD."],
+];
+function renderInterview() {
+  $("#view-interview").innerHTML = `
+    <h2 class="title">Interview Prep</h2>
+    <p class="subtitle">Test yourself with a scored quiz, then review deep-dive answers to the questions interviewers actually ask.</p>
+    <div class="grid cols-2">
+      <div class="panel"><div class="ph">Quiz <span class="badge-count" id="q-progress"></span></div><div class="pb" id="quiz-body"></div></div>
+      <div class="panel"><div class="ph">Deep-dive FAQ</div><div class="pb">${FAQ.map(f=>`<details class="faq"><summary>${f[0]}</summary><div class="a">${f[1]}</div></details>`).join("")}</div></div>
+    </div>`;
+  renderQuiz();
+}
+function renderQuiz() {
+  const done = quizIdx >= QUIZ.length;
+  $("#q-progress").textContent = done ? `score ${quizScore}/${QUIZ.length}` : `Q${quizIdx+1}/${QUIZ.length} · score ${quizScore}`;
+  const body = $("#quiz-body");
+  if (done) {
+    const pct = Math.round(quizScore/QUIZ.length*100);
+    body.innerHTML = `<div style="text-align:center;padding:20px 0"><div class="score" style="color:${pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)'}">${pct}%</div><p>You scored <b>${quizScore}/${QUIZ.length}</b>. ${pct>=70?'Interview‑ready! 🎉':'Review the FAQ and labs, then retry.'}</p><button class="btn" id="q-restart">↻ Restart quiz</button></div>`;
+    $("#q-restart").onclick = () => { quizIdx=0; quizScore=0; quizAnswered=false; renderQuiz(); };
+    return;
+  }
+  const item = QUIZ[quizIdx]; quizAnswered = false;
+  body.innerHTML = `<p style="font-weight:600;font-size:15px;margin-top:0">${item.q}</p><div id="q-opts">${item.opts.map((o,i)=>`<button class="quiz-opt" data-i="${i}">${o}</button>`).join("")}</div><div id="q-expl"></div>`;
+  $$("#q-opts .quiz-opt").forEach(b => b.onclick = () => {
+    if (quizAnswered) return; quizAnswered = true;
+    const i = +b.dataset.i; const correct = i === item.a;
+    if (correct) quizScore++;
+    $$("#q-opts .quiz-opt").forEach((x,xi)=>{ x.disabled=true; if(xi===item.a)x.classList.add("correct"); if(xi===i&&!correct)x.classList.add("wrong"); });
+    $("#q-expl").innerHTML = `<div class="expl"><b>${correct?'✓ Correct.':'✗ Not quite.'}</b> ${item.e}</div><button class="btn" id="q-next" style="margin-top:12px">${quizIdx===QUIZ.length-1?'See results':'Next question →'}</button>`;
+    $("#q-progress").textContent = `Q${quizIdx+1}/${QUIZ.length} · score ${quizScore}`;
+    $("#q-next").onclick = () => { quizIdx++; renderQuiz(); };
   });
-});
+}
 
-document.getElementById("terminal").addEventListener("click", () => input.focus());
-
-// Keep ages / ready-counts fresh.
-setInterval(render, 1000);
-
-// Boot.
-initCluster();
-render();
-printHTML('<span class="ok">Welcome to KubeLab</span> — a simulated Kubernetes cluster running entirely in your browser.');
-print('3 nodes are Ready. Type "help" for commands, or click a button below to get started.', "muted");
-input.focus();
+// ===========================================================================
+// ROUTER
+// ===========================================================================
+const RENDER = { overview: renderOverview, architecture: renderArchitecture, flow: renderFlow, rbac: renderRbac, security: renderSecurity, opa: renderOpa, operators: renderOperators, playground: renderPlayground, interview: renderInterview };
+function navigate(view) {
+  if (!RENDER[view]) view = "overview";
+  $$("#nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  $$(".view").forEach(v => v.classList.remove("active"));
+  $("#view-" + view).classList.add("active");
+  RENDER[view]();
+  location.hash = view;
+  window.scrollTo(0, 0);
+}
+$$("#nav button").forEach(b => b.onclick = () => navigate(b.dataset.view));
+navigate((location.hash || "#overview").slice(1));
 </script>
 </body>
 </html>
