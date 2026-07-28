@@ -903,8 +903,35 @@ function navigate(view) {
   location.hash = view;
   window.scrollTo(0, 0);
 }
-$$("#nav button").forEach(b => b.onclick = () => navigate(b.dataset.view));
+// Event delegation so dynamically‑added modules (see kubelab-cks.js) get wired automatically.
+$("#nav").addEventListener("click", e => { const b = e.target.closest("button[data-view]"); if (b) navigate(b.dataset.view); });
+
+// Extension API — external module files plug new labs into the same app shell.
+window.KL = {
+  $, $$, sleep, esc, APP, authorize, evalPolicies, securityScan, subjectKind, RENDER, navigate,
+  // Add a sidebar nav group with buttons: items = [[view, icon, label], ...]
+  addNavGroup(title, items) {
+    const nav = $("#nav");
+    const g = document.createElement("div"); g.className = "navgroup"; g.textContent = title; nav.appendChild(g);
+    items.forEach(([view, icon, label]) => {
+      const b = document.createElement("button"); b.dataset.view = view;
+      b.innerHTML = `<span class="ic">${icon}</span> ${label}`; nav.appendChild(b);
+    });
+  },
+  // Register a view: creates its <section> container (if needed) and its render fn.
+  addView(view, renderFn) {
+    if (!$("#view-" + view)) {
+      const s = document.createElement("section"); s.className = "view"; s.id = "view-" + view;
+      $(".main").appendChild(s);
+    }
+    RENDER[view] = renderFn;
+  },
+  injectCSS(css) { const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s); },
+};
+
 navigate((location.hash || "#overview").slice(1));
 </script>
+<script src="kubelab-cks.js"></script>
+<script>if (window.KL) window.KL.navigate((location.hash || "#overview").slice(1));</script>
 </body>
 </html>
