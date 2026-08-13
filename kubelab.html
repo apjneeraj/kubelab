@@ -213,6 +213,7 @@
       <button data-view="opa"><span class="ic">⚖️</span> OPA / Admission</button>
       <button data-view="secmap"><span class="ic">🗺️</span> Security Map</button>
       <button data-view="authn"><span class="ic">🪪</span> AuthN Deep Dive</button>
+      <button data-view="supply-deep"><span class="ic">📦</span> Supply Chain Deep Dive</button>
       <div class="navgroup">Extend &amp; Practice</div>
       <button data-view="operators"><span class="ic">🤖</span> Operators &amp; CRDs</button>
       <button data-view="playground"><span class="ic">💻</span> kubectl Playground</button>
@@ -339,10 +340,11 @@ function renderOverview() {
     ["interview", "🎓", "Interview Prep", "A scored multiple‑choice quiz plus a deep‑dive FAQ across all of the above topics."],
     ["secmap", "🗺️", "Security Map", "All Kubernetes security topics in one catalog (CKS, NSA/CISA, CIS, 4Cs) with jumps into labs and gaps called out."],
     ["authn", "🪪", "AuthN Deep Dive", "Walk the authenticator chain, steal a ServiceAccount token, and see why bound projected tokens die with the pod."],
+    ["supply-deep", "📦", "Supply Chain Deep Dive", "Retag an image, watch a digest-pinned workload stay safe, then gate Cosign keyless identity, SBOM, SLSA, and CI OIDC at admission."],
   ];
   $("#view-overview").innerHTML = `
     <h2 class="title">Interactive Kubernetes Learning Lab</h2>
-    <p class="subtitle">A hands‑on, 100% in‑browser environment to learn Kubernetes <b>internals</b>, <b>RBAC</b>, <b>container security</b>, <b>OPA/admission policies</b> and <b>operators</b> — with animated request flows so you can <i>see</i> how each request is processed. Open the <b>Security Map</b> for the full topic catalog, then the <b>AuthN Deep Dive</b> for bound ServiceAccount tokens. Great for building intuition and preparing for interviews.</p>
+    <p class="subtitle">A hands‑on, 100% in‑browser environment to learn Kubernetes <b>internals</b>, <b>RBAC</b>, <b>container security</b>, <b>OPA/admission policies</b> and <b>operators</b> — with animated request flows so you can <i>see</i> how each request is processed. Open the <b>Security Map</b> for the full topic catalog, then the <b>AuthN</b> and <b>Supply Chain</b> deep dives. Great for building intuition and preparing for interviews.</p>
     <div class="grid cols-2">
       ${cards.map(c => `<button class="card-btn" data-goto="${c[0]}"><div class="emoji">${c[1]}</div><h3>${c[2]}</h3><p>${c[3]}</p></button>`).join("")}
     </div>`;
@@ -852,6 +854,7 @@ const QUIZ = [
   { q: "An Operator is best described as…", opts: ["A managed cloud service", "A CRD plus a controller with a reconcile loop", "A type of Service", "A node agent"], a: 1, e: "Operators extend the API with a CRD and add a controller that reconciles the custom resource's desired state into real objects." },
   { q: "What does kube-proxy program on each node?", opts: ["Container images", "iptables/IPVS rules for Service VIPs", "etcd snapshots", "Pod manifests"], a: 1, e: "kube-proxy watches Services/Endpoints and programs netfilter (iptables/IPVS/eBPF) so ClusterIP traffic load-balances to pod endpoints." },
   { q: "A projected (bound) ServiceAccount token is rejected after the pod is deleted because…", opts: ["NetworkPolicy dropped it", "It has no signature", "It is bound to the Pod UID, has an expiry, and an audience — TokenReview fails when the pod is gone", "etcd garbage-collects JWTs"], a: 2, e: "Bound tokens are issued via the TokenRequest API with aud, exp, and boundObjectRef. Legacy Secret tokens have none of those and survive pod deletion. See the AuthN Deep Dive." },
+  { q: "Why must ClusterImagePolicy match a Cosign keyless identity (repo/workflow), not merely “a signature exists”?", opts: ["Signatures are slow", "Anyone can keyless-sign from their own GitHub repo — the policy must constrain iss/sub to your org", "Sigstore does not support signatures", "Digests cannot be signed"], a: 1, e: "Keyless Cosign issues a Fulcio cert from CI OIDC. Without identities.subjectRegExp for your org/workflow, an attacker signs their poisoned image with their own account and admission still passes. See the Supply Chain Deep Dive." },
 ];
 let quizIdx = 0, quizScore = 0, quizAnswered = false;
 const FAQ = [
@@ -862,6 +865,7 @@ const FAQ = [
   ["Mutating vs validating admission webhooks?", "Mutating webhooks run first and can modify the object (inject sidecars, set defaults). Validating webhooks run after and can only accept or reject. Both run after authN/authZ and before persistence. OPA Gatekeeper is typically validating."],
   ["When would you write an Operator instead of using a Deployment?", "When managing a stateful or complex application needs domain-specific operational logic — e.g. ordered scaling, backups, failover, version upgrades for a database. The operator encodes that human runbook as a controller reconciling a CRD."],
   ["What's the difference between a legacy ServiceAccount token and a bound projected token?", "Legacy tokens (pre-1.24 default) are Secrets in etcd: no expiry, no audience, not bound to a pod — they still authenticate after the pod is deleted. Bound tokens are minted by the TokenRequest API, projected into the pod by the kubelet, carry aud + exp + the pod UID, and fail TokenReview when the pod is gone or the clock is past exp. Also disable automount on the default SA so workloads that never call the API don't get a credential at all. (AuthN Deep Dive lab.)"],
+  ["How do you stop a poisoned image if someone retags :1.2.0 in the registry?", "Pin the workload by digest (@sha256:…), require Cosign verification at admission with ClusterImagePolicy identities locked to your GitHub org/workflow (not “any signature”), allow only your registry, attach an SBOM, require SLSA provenance, and authenticate CI with OIDC instead of a long-lived cloud key. Helm has the same problem one layer up: helm install --verify. (Supply Chain Deep Dive lab.)"],
 ];
 function renderInterview() {
   $("#view-interview").innerHTML = `
@@ -938,6 +942,7 @@ window.KL = {
 navigate((location.hash || "#overview").slice(1));
 </script>
 <script src="kubelab-secmap.js"></script>
+<script src="kubelab-supply-deep.js"></script>
 <script src="kubelab-cks.js"></script>
 <script>if (window.KL) window.KL.navigate((location.hash || "#overview").slice(1));</script>
 </body>

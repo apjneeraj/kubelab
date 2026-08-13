@@ -114,7 +114,7 @@
         { t: "OPA / Gatekeeper (ConstraintTemplate + Constraint)", s: "lab", lab: ["opa", "OPA / Admission"] },
         { t: "Kyverno (validate / mutate / generate / verifyImages)", s: "gap" },
         { t: "Kubewarden / jsPolicy", s: "gap" },
-        { t: "ImagePolicyWebhook, Binary Authorization", s: "partial", lab: ["supplychain", "Supply Chain"] },
+        { t: "ImagePolicyWebhook, Binary Authorization", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
         { t: "Defaulting vs rejecting; fail-open vs fail-closed webhooks", s: "gap" },
       ],
     },
@@ -204,18 +204,18 @@
       n: 9, id: "supply", name: "Supply chain security", layer: "Code",
       blurb: "Build-time trust, not just runtime.",
       items: [
-        { t: "Minimal / distroless / scratch base images", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "Pin by digest, never mutable tags", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "Permitted registries only", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "Scan: Trivy, Grype, Clair; fail on critical/high", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "SBOM (Syft, SPDX, CycloneDX) + VEX", s: "partial", lab: ["supplychain", "Supply Chain"] },
-        { t: "Sign and verify: Cosign (keyless), Notation, Sigstore Policy Controller", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "SLSA provenance (L2+)", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "Dockerfile / Helm / manifest static analysis (Kubesec, KubeLinter, Checkov)", s: "partial", lab: ["supplychain", "Supply Chain"] },
-        { t: "CI OIDC federation (no long-lived cloud keys in pipelines)", s: "gap" },
-        { t: "Chart provenance; disable Tiller-era patterns", s: "gap" },
-        { t: "Admission: deny unsigned / unscanned / foreign-registry images", s: "lab", lab: ["supplychain", "Supply Chain"] },
-        { t: "Binary Authorization / in-toto", s: "gap" },
+        { t: "Minimal / distroless / scratch base images", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Pin by digest, never mutable tags", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Permitted registries only", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Scan: Trivy, Grype, Clair; fail on critical/high", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "SBOM (Syft, SPDX, CycloneDX) + VEX", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Sign and verify: Cosign (keyless), Notation, Sigstore Policy Controller", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "SLSA provenance (L2+)", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Dockerfile / Helm / manifest static analysis (Kubesec, KubeLinter, Checkov)", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "CI OIDC federation (no long-lived cloud keys in pipelines)", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Chart provenance; disable Tiller-era patterns", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Admission: deny unsigned / unscanned / foreign-registry images", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
+        { t: "Binary Authorization / in-toto", s: "partial", lab: ["supply-deep", "Supply Chain Deep Dive"] },
       ],
     },
     {
@@ -255,7 +255,7 @@
         { t: "Overprivileged SA → create privileged pod → node", s: "partial", lab: ["rbac", "RBAC Lab"] },
         { t: "Unauthenticated kubelet / read-only port", s: "lab", lab: ["cluster-hardening", "CIS Auditor"] },
         { t: "SSRF to cloud metadata → node credentials", s: "deep", lab: ["authn", "AuthN Deep Dive"] },
-        { t: "Unsigned / poisoned image", s: "lab", lab: ["supplychain", "Supply Chain"] },
+        { t: "Unsigned / poisoned image", s: "deep", lab: ["supply-deep", "Supply Chain Deep Dive"] },
         { t: "Mutating webhook as persistence", s: "gap" },
         { t: "Cryptomining DaemonSet", s: "partial", lab: ["runtime", "Runtime Security"] },
         { t: "Ingress controller CVEs (large attack surface)", s: "gap" },
@@ -291,7 +291,7 @@
       `<button data-filt="${id}" class="${mapFilter===id?"on":""}">${label} <span class="badge-count">${n}</span></button>`;
     $("#view-secmap").innerHTML = `
       <h2 class="title">Kubernetes Security Map</h2>
-      <p class="subtitle">Every major Kubernetes security topic in one place — CKS curriculum, NSA/CISA hardening, CIS Benchmark, and the <b>4Cs</b> (Cloud → Cluster → Container → Code). Status shows what KubeLab already simulates. The deep-dive lab for this release is <b>Authentication &amp; bound ServiceAccount tokens</b>.</p>
+      <p class="subtitle">Every major Kubernetes security topic in one place — CKS curriculum, NSA/CISA hardening, CIS Benchmark, and the <b>4Cs</b> (Cloud → Cluster → Container → Code). Status shows what KubeLab already simulates. Deep dives: <b>AuthN &amp; bound tokens</b> and <b>Supply chain (digest, Cosign, SLSA)</b>.</p>
 
       <div class="fourcs">
         <div class="c"><div class="cn">☁️ Cloud</div><div class="cd">Account, IAM, private API, metadata, fleet</div><span class="arr">›</span></div>
@@ -311,7 +311,8 @@
         ${filt("all","All",c.all)}${filt("deep","Deep dive",c.deep)}${filt("lab","Has lab",c.lab)}${filt("partial","Partial",c.partial)}${filt("gap","Gap",c.gap)}
       </div>
       <div class="row" style="margin-bottom:14px">
-        <button class="btn" data-goto="authn">🪪 Open AuthN Deep Dive</button>
+        <button class="btn" data-goto="authn">🪪 AuthN Deep Dive</button>
+        <button class="btn" data-goto="supply-deep">📦 Supply Chain Deep Dive</button>
         <button class="btn ghost" data-goto="cks-overview">CKS exam domains →</button>
       </div>
       <div id="map-list">
@@ -327,7 +328,7 @@
           </div>`;
         }).join("")}
       </div>
-      <div class="expl" style="margin-top:8px"><b>How to use this:</b> filter by status, expand a domain, jump into a lab. Gaps are future deep dives (VAP/CEL, Kyverno, AppArmor, Cilium mTLS, audit-policy authoring, GitOps security, threat-path walkthroughs).</div>`;
+      <div class="expl" style="margin-top:8px"><b>How to use this:</b> filter by status, expand a domain, jump into a lab. Remaining gaps include VAP/CEL, Kyverno, AppArmor, Cilium mTLS, audit-policy authoring, GitOps security, and threat-path walkthroughs.</div>`;
     $$("#view-secmap [data-filt]").forEach(b => b.onclick = () => { mapFilter = b.dataset.filt; renderSecmap(); });
     $$("#view-secmap .th").forEach(h => h.onclick = () => {
       const n = +h.parentElement.dataset.n;
