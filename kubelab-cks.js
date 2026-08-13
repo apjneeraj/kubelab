@@ -74,7 +74,7 @@
         "Use RBAC to minimize exposure",
         "Exercise caution with ServiceAccounts (disable defaults, minimize permissions)",
         "Restrict access to the Kubernetes API (anonymous-auth, authz mode)",
-        "Upgrade Kubernetes to avoid vulnerabilities"], labs: [["cluster-hardening","CIS Auditor"],["rbac","RBAC Lab"]] },
+        "Upgrade Kubernetes to avoid vulnerabilities"], labs: [["cluster-hardening","CIS Auditor"],["rbac","RBAC Lab"],["authn","AuthN Deep Dive"]] },
     { name: "System Hardening", w: 10, items: [
         "Minimize host OS footprint (reduce attack surface)",
         "Use least-privilege identity and access management",
