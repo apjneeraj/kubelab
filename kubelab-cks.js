@@ -89,7 +89,7 @@
         "Minimize base image footprint (distroless)",
         "Understand your supply chain (SBOM, CI/CD, artifact repos)",
         "Secure your supply chain (permitted registries, sign & verify with Cosign)",
-        "Static analysis of workloads and images (Kubesec, KubeLinter, Trivy)"], labs: [["supplychain","Supply Chain Lab"]] },
+        "Static analysis of workloads and images (Kubesec, KubeLinter, Trivy)"], labs: [["supplychain","Supply Chain Lab"],["supply-deep","Supply Chain Deep Dive"]] },
     { name: "Monitoring, Logging & Runtime Security", w: 20, items: [
         "Behavioral analytics to detect malicious activity (Falco, Tetragon)",
         "Detect threats across infra, apps, networks, data, users, workloads",

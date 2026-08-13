@@ -6,3 +6,4 @@ Interactive, 100% in-browser Kubernetes learning lab. Open [`kubelab.html`](kube
 - Security labs: RBAC, container security, OPA/admission, CKS modules (CIS, NetworkPolicy, PSS, supply chain, secrets, runtime)
 - **Security Map** — catalog of all Kubernetes security topics (CKS, NSA/CISA, CIS, 4Cs)
 - **AuthN Deep Dive** — authenticator chain, legacy vs bound ServiceAccount tokens, automount, Workload Identity
+- **Supply Chain Deep Dive** — tag mutation, Cosign keyless + ClusterImagePolicy identities, SBOM/VEX, SLSA, CI OIDC, Helm provenance
